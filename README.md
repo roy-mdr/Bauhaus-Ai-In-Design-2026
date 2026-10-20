@@ -1,12 +1,16 @@
-# Walking reach: Weimar
+# A* route walk: Weimar
 
-A 3D map of central Weimar that shows how far you can walk in 5, 10 and 15 minutes from any point, which buildings you reach, and about how many people live there.
+A 3D map of central Weimar. Pick an origin and a destination, watch the A* search algorithm find the shortest walking route through the street network, then walk the route in first person.
 
 ## What it does
 
 - Shows every building of the city kit in 3D, extruded from its footprint to its measured height, coloured by its main use (legend at the top right), with the pedestrian network drawn as thin lines.
-- Click on the ground (or on a building) to start a walk. The app draws three nested areas in three shades of orange: dark for 5, middle for 10, light for 15 minutes. Buildings touching an area take its shade.
-- The panel lists, for each of the three times, the number of buildings reached and about how many residents live in the area.
+- A banner at the top of the map shows the four steps (origin, destination, A* search, walkthrough), marks the current one, and says what to do next.
+- Click on the map to set the origin, then click again to set the destination. Each gets a large glowing sphere on a pillar with its name above it (green for the origin, yellow for the destination), and the buildings around the click light up in the same colour, closest first. If the nearest street corner is away from the click, a small dot and a line join the two; the panel says how far it is.
+- The city fades to night and the camera moves in to frame both points. The search is then replayed step by step: streets flash white and cool to blue as A* walks along them, white dots mark the frontier (the nodes waiting to be looked at), and a ring bursts outwards each time a node is settled.
+- When the destination is reached, the shortest route is drawn from origin to destination in a green-to-yellow gradient, with light pulses running along it.
+- The camera then flies down to eye height and walks the route in first person, then rises again to show the whole route. "Skip to the end" ends the walk early; "Walk again" repeats it; "New route" starts over. A click on the map after the walk also starts a new route.
+- The panel shows the route length, the walking time, and how many street nodes A* looked at compared with Dijkstra's search for the same route.
 - Drag to orbit, right-drag to pan, scroll to zoom.
 
 ## Run it
@@ -21,22 +25,21 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 
 ## Method
 
-- **Walking speed:** 4.8 km/h, that is 80 m per minute, so 400, 800 and 1200 m for 5, 10 and 15 minutes.
-- **Start:** the network node nearest to the click. If no walkable street is within 100 m of the click, the app says so and draws nothing.
-- **Walking:** the shortest walking distance from the start to every node along the walkable edges of `streets.graph.json`, using each edge's `length` in metres. Edges can be walked both ways.
-- **Areas:** the street segments reached in the time, including the reachable part of the last segment, with a band of 25 m on each side, joined into one shape. It follows the streets: it is not a circle and not a convex hull, and it has holes where blocks are not reached.
-- **Buildings:** a building counts when its footprint touches the area, that is when it lies within 25 m of a reached piece of street. A building touching the 5-minute area also counts for 10 and 15 minutes.
-- **Residents:** from the Zensus 2022 grid of 100 m cells. For every cell that overlaps the area, its population times the share of the cell's area that lies inside the area. These are added up and rounded to the nearest 10.
-- **Cells without a figure:** some cells have no published population (`null`). They are not zero: they are left out of the sum, and the panel shows next to it how many such cells overlap the area.
+- **Network:** the walkable edges of `streets.graph.json`, each with its `length` in metres. Edges can be walked both ways.
+- **Origin and destination:** the network nodes nearest to the two clicks. If no walkable street is within 100 m of a click, the app says so and sets nothing.
+- **A\*:** from the origin, the search keeps a frontier of nodes it could look at next. It always takes the one with the smallest "distance walked so far + straight-line distance still to the destination", so it reaches towards the destination instead of spreading in all directions. The straight line is never longer than the real walk, so the route found is the shortest along the network.
+- **Comparison:** the app also runs Dijkstra's search, which ignores the straight-line distance, and shows how many nodes it would have looked at for the same route.
+- **Walking time:** route length at 4.8 km/h, that is 80 m per minute.
+- **Walkthrough:** a smooth camera glide, no walking motion, at 40 m per second, about thirty times walking pace, with the eye 1.7 m above the ground. Corners are rounded off slightly, and the camera turns smoothly towards a point 30 m ahead.
 
 ## Limits
 
-- The walk starts at a street node, not at the exact click point; the few metres from the click to the node are not counted.
-- Every walker moves at the same steady speed: no waiting at crossings, no slopes, no stairs, no crowding.
-- The network is a drawing for a walking simulation. Paths it does not contain, such as through courtyards or private ground, are not walked.
-- The 25 m band is a stand-in for "close to the street"; it does not know where the entrances of buildings are.
-- Residents are spread evenly over each 100 m cell, which is rarely true. The census also changes small counts slightly at random to protect privacy, so single cells are approximate. Treat the numbers as "about".
-- The kit covers only part of Weimar. Areas near its edge are cut off by the end of the network, and residents outside the kit's census cells are not counted.
+- The route starts and ends at street nodes, not at the exact click points; the few metres from a click to its node are not counted.
+- The walk is on flat ground at a steady speed: no waiting at crossings, no slopes, no stairs.
+- The network is a drawing for a walking simulation. Paths it does not contain, such as through courtyards or private ground, are not used.
+- Buildings in the walkthrough are simple blocks with flat roofs at their highest point; roofs, façades and trees are not modelled.
+- The kit covers only part of Weimar. Routes can only use the network inside it.
+- The census grid in `public/data/` is loaded but not used by this version.
 
 ## Data sources
 
@@ -54,5 +57,5 @@ Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedest
 
 1. Tools: Claude Code, with the model Claude Opus 5.5.
 2. I decided:
-3. The agent did: read the data and `SOURCES.md`, then wrote the 3D city, the walking and resident calculation, the panel and this README, and checked the page in a headless browser.
+3. The agent did: read the data and `SOURCES.md`, then wrote the 3D city, the walking and resident calculation, the panel and this README, and checked the page in a headless browser. Later it replaced the walking areas with the A* search replay and the first-person walk.
 4. I checked:

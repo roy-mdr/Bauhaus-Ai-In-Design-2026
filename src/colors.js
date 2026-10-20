@@ -31,3 +31,16 @@ export const REACH_COLORS = ['#b8431c', '#e2804f', '#f4bf9f']
 
 export const GROUND_COLOR = '#efede6'
 export const STREET_COLOR = '#8e8b83'
+export const BACKGROUND_COLOR = '#f7f6f2'
+
+// While a route is shown the city fades to night, so the search glows.
+export const NIGHT = { background: '#0d1018', ground: '#161a26', street: '#343b52', buildings: '#5d6478' }
+
+// The search and the route.
+export const ROUTE_COLORS = {
+  explored: '#2f8cff', // streets the search has walked along
+  fresh: '#d9f3ff', // an edge in the moment it is walked
+  frontier: '#ffffff', // nodes waiting to be looked at
+  origin: '#22e3a0',
+  destination: '#ffc23d',
+}

@@ -32,6 +32,7 @@ body {
 .panel,
 .legend {
   position: absolute;
+  z-index: 10;
   top: 12px;
   background: rgba(255, 255, 255, 0.92);
   border-radius: 6px;
@@ -109,37 +110,47 @@ h2 {
   border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
-.shops h2 {
-  font-size: 13px;
-  margin: 4px 0 4px;
-}
-
-.shops ul {
-  list-style: none;
-  margin: 4px 0 12px;
-  padding: 0;
-  max-height: 180px;
-  overflow-y: auto;
-}
-
-.shops button {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  padding: 3px 4px;
-  border: 0;
+.results th {
   border-bottom: 1px solid #eee;
-  background: none;
+  vertical-align: top;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.actions button {
+  padding: 5px 10px;
+  border: 1px solid #c9c6bd;
+  border-radius: 4px;
+  background: #fff;
   font: inherit;
   font-size: 13px;
-  text-align: left;
   cursor: pointer;
 }
 
-.shops button:hover,
-.shops button.marked {
-  background: #f6e3d8;
+.actions button:hover {
+  background: #eef3ff;
+}
+
+.progress {
+  font-variant-numeric: tabular-nums;
+  color: #444;
+}
+
+.key {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  font-size: 12px;
+}
+
+.key li {
+  margin: 2px 0;
 }
 
 .method {
@@ -170,6 +181,108 @@ h2 {
   font-size: 11px;
   color: #444;
   background: rgba(255, 255, 255, 0.85);
+}
+
+.app.picking canvas {
+  cursor: crosshair;
+}
+
+/* The banner over the map: the steps, and what to do next. */
+.steps {
+  position: absolute;
+  z-index: 10;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 24px - 2 * 360px);
+  padding: 10px 16px 12px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+.steps ol {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  font-size: 12px;
+  color: #888;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.steps .number {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #bbb;
+  font-size: 11px;
+}
+
+.steps li.now {
+  color: #1c1c1c;
+  font-weight: 600;
+}
+
+.steps li.now .number {
+  background: #1c1c1c;
+  border-color: #1c1c1c;
+  color: #fff;
+}
+
+.steps li.past .number {
+  background: #e3f6ee;
+  border-color: #22b07d;
+  color: #12805a;
+}
+
+.instruction {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.points {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.points li {
+  margin: 3px 0;
+}
+
+/* The floating name above each marker on the map. */
+.marker-label {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--marker);
+  color: #111;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 1100px) {
+  .steps {
+    top: auto;
+    bottom: 40px;
+    max-width: calc(100% - 24px);
+  }
 }
 
 @media (max-width: 700px) {

@@ -88,7 +88,7 @@ export function prepareCity({ kit, buildings, graph, zensus }) {
 
 // --- small geometry helpers, all in metres ---
 
-function pointSegmentDistance([px, py], [ax, ay], [bx, by]) {
+export function pointSegmentDistance([px, py], [ax, ay], [bx, by]) {
   const dx = bx - ax, dy = by - ay
   const len2 = dx * dx + dy * dy
   const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2))
