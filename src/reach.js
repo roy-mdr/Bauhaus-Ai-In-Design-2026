@@ -105,7 +105,7 @@ function segmentSegmentDistance(a, b, c, d) {
   return Math.min(pointSegmentDistance(a, c, d), pointSegmentDistance(b, c, d), pointSegmentDistance(c, a, b), pointSegmentDistance(d, a, b))
 }
 
-function insideRing([px, py], ring) {
+export function insideRing([px, py], ring) {
   let inside = false
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [xi, yi] = ring[i], [xj, yj] = ring[j]

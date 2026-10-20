@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import City, { WALK_M_PER_S, EYE_M } from './City.jsx'
 import { prepareCity, MAX_SNAP_M, SPEED_M_PER_MIN } from './reach.js'
 import { prepareRouting, snapToNode, findRoute } from './route.js'
+import { makeParks } from './trees.js'
 import { USES, ROUTE_COLORS } from './colors.js'
 
-const FILES = { kit: 'kit.json', buildings: 'buildings.geojson', graph: 'streets.graph.json', zensus: 'zensus.geojson' }
+const FILES = { kit: 'kit.json', buildings: 'buildings.geojson', graph: 'streets.graph.json', zensus: 'zensus.geojson', plots: 'plots.geojson' }
 
 // Worded as in public/data/SOURCES.md.
 const ATTRIBUTION =
@@ -56,6 +57,7 @@ export default function App() {
 
   const city = useMemo(() => data && prepareCity(data), [data])
   const links = useMemo(() => city && prepareRouting(city), [city])
+  const parks = useMemo(() => city && makeParks(city, data.plots), [city, data])
 
   const reset = () => {
     setOrigin(null)
@@ -91,7 +93,7 @@ export default function App() {
   return (
     <div className={PICKING.has(phase) ? 'app picking' : 'app'}>
       {city ? (
-        <City city={city} size={data.kit.size_m} origin={origin} destination={destination} route={route}
+        <City city={city} parks={parks} size={data.kit.size_m} origin={origin} destination={destination} route={route}
           walkCmd={walkCmd} onPick={pick} onPhase={setPhase} progressRef={progressRef} />
       ) : (
         <p className="loading">{error ? `The city kit didn't load (${error}).` : 'Loading the city kit…'}</p>
@@ -184,6 +186,11 @@ export default function App() {
             Origin and destination are the network nodes nearest to your clicks; if no walkable street is within{' '}
             {MAX_SNAP_M} m, nothing is set. The walking time is at 4.8 km/h. The walkthrough moves at {WALK_M_PER_S} m
             per second, about {Math.round(WALK_M_PER_S / (SPEED_M_PER_MIN / 60))} times walking pace, with the eye {EYE_M} m above the ground.
+          </p>
+          <p>
+            Parks are the plots with the land use "recreation", drawn in green. The kit has no tree data: the{' '}
+            {parks ? fmt(parks.treeCount) : ''} trees in them are an illustration, placed about every 9 m, away from
+            buildings and paths, so you can tell a park when you pass through it.
           </p>
         </div>
       </aside>

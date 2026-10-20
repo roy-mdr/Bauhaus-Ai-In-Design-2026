@@ -5,6 +5,7 @@ A 3D map of central Weimar. Pick an origin and a destination, watch the A* searc
 ## What it does
 
 - Shows every building of the city kit in 3D, extruded from its footprint to its measured height, coloured by its main use (legend at the top right), with the pedestrian network drawn as thin lines.
+- Parks are drawn on green ground and filled with trees made of point clouds, a trunk and a leafy crown each, so you can tell a park from above and when you pass through one in the walkthrough.
 - A banner at the top of the map shows the four steps (origin, destination, A* search, walkthrough), marks the current one, and says what to do next.
 - Click on the map to set the origin, then click again to set the destination. Each gets a large glowing sphere on a pillar with its name above it (green for the origin, yellow for the destination), and the buildings around the click light up in the same colour, closest first. If the nearest street corner is away from the click, a small dot and a line join the two; the panel says how far it is.
 - The city fades to night and the camera moves in to frame both points. The search is then replayed step by step: streets flash white and cool to blue as A* walks along them, white dots mark the frontier (the nodes waiting to be looked at), and a ring bursts outwards each time a node is settled.
@@ -40,6 +41,7 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 - Buildings in the walkthrough are simple blocks with flat roofs at their highest point; roofs, façades and trees are not modelled.
 - The kit covers only part of Weimar. Routes can only use the network inside it.
 - The census grid in `public/data/` is loaded but not used by this version.
+- The trees are an illustration, not data: the kit has no trees. They are scattered over the plots with the land use `recreation` in `plots.geojson`, about one every 9 m, at least 3.5 m from the walking network and 2 m from buildings, with random heights of 8 to 18 m. Trees in streets, courtyards and cemeteries are not drawn.
 
 ## Data sources
 
@@ -49,6 +51,7 @@ All data is in `public/data/`; see `public/data/SOURCES.md`.
 | --- | --- | --- |
 | Building footprints and heights | 3D building models LoD2 of Thuringia, © GDI-Th; uses added by Egor Gaydukov | dl-de/by-2-0 |
 | Pedestrian network | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar | |
+| Land use per plot (parks) | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar | |
 | Census grid | Zensus 2022, 100 m grid, © Statistische Ämter des Bundes und der Länder | dl-de/by-2-0 |
 
 Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedestrian network: Egor Gaydukov, InfAU, Bauhaus-Universität Weimar. Census grid: Zensus 2022, © Statistische Ämter des Bundes und der Länder (dl-de/by-2-0).

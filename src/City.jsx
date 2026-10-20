@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { colorForUse, GROUND_COLOR, STREET_COLOR, BACKGROUND_COLOR, NIGHT, ROUTE_COLORS } from './colors.js'
+import { colorForUse, GROUND_COLOR, STREET_COLOR, PARK_COLOR, BACKGROUND_COLOR, NIGHT, ROUTE_COLORS } from './colors.js'
 
 // The scene is built in metres with x to the east, y to the north and z up.
 // One rotation of the whole group turns it into three.js's "y is up".
@@ -153,10 +153,58 @@ function Streets({ edges, materials }) {
   )
 }
 
+// The parks: green ground, drawn just above the plain ground.
+function ParkGround({ parks, materials }) {
+  const geometry = useMemo(() => {
+    const shapes = parks.map(([outer, ...holes]) => {
+      const shape = new THREE.Shape(outer.map(([x, y]) => new THREE.Vector2(x, y)))
+      shape.holes = holes.map((h) => new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y))))
+      return shape
+    })
+    return new THREE.ShapeGeometry(shapes)
+  }, [parks])
+  return (
+    <mesh geometry={geometry} position={[0, 0, 0.1]} raycast={noRaycast} renderOrder={1}>
+      <meshBasicMaterial color={PARK_COLOR} ref={(m) => { materials.park = m }} />
+    </mesh>
+  )
+}
+
+// The trees as one point cloud. Each point is a round dot about half a metre wide, never smaller
+// than a pixel and a half, so the parks still read from far away, and never larger than 14 pixels,
+// so crowns close to the camera stay leafy instead of turning into large discs. The crowns sway a little in the wind.
+function Trees({ positions, colors, materials }) {
+  const geometry = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    g.computeBoundingSphere()
+    return g
+  }, [positions, colors])
+  const material = useMemo(() => {
+    const m = new THREE.PointsMaterial({ size: 0.55, sizeAttenuation: true, vertexColors: true })
+    m.userData.time = { value: 0 }
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = m.userData.time
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uTime;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.xy += sin(uTime * 1.3 + position.x * 0.2 + position.y * 0.15) * 0.02 * position.z;')
+        .replace('#include <logdepthbuf_vertex>', 'gl_PointSize = clamp(gl_PointSize, 1.5, 14.0);\n#include <logdepthbuf_vertex>')
+      shader.fragmentShader = shader.fragmentShader.replace('void main() {', 'void main() {\n  if (length(gl_PointCoord - 0.5) > 0.5) discard;')
+    }
+    return m
+  }, [])
+  materials.trees = material
+  useFrame(({ clock }) => {
+    material.userData.time.value = clock.elapsedTime
+  })
+  return <points geometry={geometry} material={material} raycast={noRaycast} />
+}
+
 // Fades the city between day and night: night while a route is shown, so the search glows.
 function NightFade({ on, materials }) {
   const night = useRef(0)
-  const day = useMemo(() => ({ background: new THREE.Color(BACKGROUND_COLOR), ground: new THREE.Color(GROUND_COLOR), street: new THREE.Color(STREET_COLOR), buildings: new THREE.Color('#ffffff') }), [])
+  const day = useMemo(() => ({ background: new THREE.Color(BACKGROUND_COLOR), ground: new THREE.Color(GROUND_COLOR), street: new THREE.Color(STREET_COLOR), buildings: new THREE.Color('#ffffff'), park: new THREE.Color(PARK_COLOR), trees: new THREE.Color('#ffffff') }), [])
   const dark = useMemo(() => Object.fromEntries(Object.entries(NIGHT).map(([k, c]) => [k, new THREE.Color(c)])), [])
   useFrame(({ scene }, dt) => {
     const before = night.current
@@ -164,7 +212,7 @@ function NightFade({ on, materials }) {
     if (Math.abs(before - night.current) < 1e-4) return
     const k = night.current
     scene.background?.lerpColors(day.background, dark.background, k)
-    for (const key of ['ground', 'street', 'buildings']) materials[key]?.color.lerpColors(day[key], dark[key], k)
+    for (const key of ['ground', 'street', 'buildings', 'park', 'trees']) materials[key]?.color.lerpColors(day[key], dark[key], k)
   })
   return null
 }
@@ -567,7 +615,7 @@ function Beacon({ point, color: hex, label }) {
   )
 }
 
-export default function City({ city, size, origin, destination, route, walkCmd, onPick, onPhase, progressRef }) {
+export default function City({ city, parks, size, origin, destination, route, walkCmd, onPick, onPhase, progressRef }) {
   // Ignore clicks that end a drag (orbiting or panning).
   const pick = (e) => {
     e.stopPropagation()
@@ -597,7 +645,9 @@ export default function City({ city, size, origin, destination, route, walkCmd, 
           <planeGeometry args={[w + 600, h + 600]} />
           <meshBasicMaterial color={GROUND_COLOR} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} ref={(m) => { materials.ground = m }} />
         </mesh>
+        {parks && <ParkGround parks={parks.parks} materials={materials} />}
         <Streets edges={city.edges} materials={materials} />
+        {parks && <Trees positions={parks.positions} colors={parks.colors} materials={materials} />}
         <Buildings buildings={city.buildings} materials={materials} highlights={highlights} onPick={pick} />
         {route && <RouteShow key={route.id} city={city} route={route} walkCmd={walkCmd} onPhase={onPhase} progressRef={progressRef} />}
         {origin && <Beacon key={`o${origin.node}`} point={origin} color={ROUTE_COLORS.origin} label="Origin" />}
