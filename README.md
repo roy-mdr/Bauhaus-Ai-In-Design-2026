@@ -1,18 +1,18 @@
-# A* route walk: Weimar
+# A\* route walk: Weimar
 
-A 3D map of central Weimar. Pick an origin and a destination, watch the A* search algorithm find the shortest walking route through the street network, then walk the route in first person.
+A 3D map of central Weimar. Pick an origin and a destination, watch the A\* search algorithm find the shortest walking route through the street network, then walk the route in first person.
 
 ## What it does
 
 - Shows every building of the city kit in 3D, extruded from its footprint to its measured height, coloured by its main use (legend at the top right), with the pedestrian network drawn as thin lines.
 - The ground follows the real topography, from the Ilm valley in the east (about 205 m above sea level) up to the west. Buildings, streets, trees, the search and the route all sit on it, and the walkthrough rises and falls with the slopes.
 - Parks are drawn on green ground and filled with trees made of point clouds, a trunk and a leafy crown each, so you can tell a park from above and when you pass through one in the walkthrough.
-- A banner at the top of the map shows the four steps (origin, destination, A* search, walkthrough), marks the current one, and says what to do next.
+- A banner at the top of the map shows the four steps (origin, destination, A\* search, walkthrough), marks the current one, and says what to do next.
 - Click on the map to set the origin, then click again to set the destination. Each gets a large glowing sphere on a pillar with its name above it (green for the origin, yellow for the destination), and the buildings around the click light up in the same colour, closest first. If the nearest street corner is away from the click, a small dot and a line join the two; the panel says how far it is.
-- The city fades to night and the camera moves in to frame both points. The search is then replayed step by step: streets flash white and cool to blue as A* walks along them, white dots mark the frontier (the nodes waiting to be looked at), and a ring bursts outwards each time a node is settled.
+- The city fades to night and the camera moves in to frame both points. The search is then replayed step by step: streets flash white and cool to blue as A\* walks along them, white dots mark the frontier (the nodes waiting to be looked at), and a ring bursts outwards each time a node is settled.
 - When the destination is reached, the shortest route is drawn from origin to destination in a green-to-yellow gradient, with light pulses running along it.
 - The camera then flies down to eye height and walks the route in first person, then rises again to show the whole route. "Skip to the end" ends the walk early; "Walk again" repeats it; "New route" starts over. A click on the map after the walk also starts a new route.
-- The panel shows the route length, the walking time, and how many street nodes A* looked at compared with Dijkstra's search for the same route.
+- The panel shows the route length, the walking time, and how many street nodes A\* looked at compared with Dijkstra's search for the same route.
 - Drag to orbit, right-drag to pan, scroll to zoom.
 
 ## Run it
@@ -39,7 +39,7 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 ## Limits
 
 - The route starts and ends at street nodes, not at the exact click points; the few metres from a click to its node are not counted.
-- Route lengths and walking times are measured on the map, as in the network: slopes don't make a route longer or slower, and A* doesn't avoid hills. There is no waiting at crossings and no stairs.
+- Route lengths and walking times are measured on the map, as in the network: slopes don't make a route longer or slower, and A\* doesn't avoid hills. There is no waiting at crossings and no stairs.
 - The terrain is averaged over 5 m, so kerbs, steps, walls and small embankments are smoothed away; bridges and underpasses don't exist in it (the ground model runs under bridges).
 - The network is a drawing for a walking simulation. Paths it does not contain, such as through courtyards or private ground, are not used.
 - Buildings in the walkthrough are simple blocks with flat roofs at their highest point; roofs, façades and trees are not modelled.
@@ -51,12 +51,12 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 
 All data is in `public/data/`; see `public/data/SOURCES.md`.
 
-| Data | Source | Licence |
-| --- | --- | --- |
-| Building footprints and heights | 3D building models LoD2 of Thuringia, © GDI-Th; uses added by Egor Gaydukov | dl-de/by-2-0 |
-| Pedestrian network | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar | |
-| Land use per plot (parks) | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar | |
-| Census grid | Zensus 2022, 100 m grid, © Statistische Ämter des Bundes und der Länder | dl-de/by-2-0 |
+| Data                                          | Source                                                                                                                       | Licence      |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Building footprints and heights               | 3D building models LoD2 of Thuringia, © GDI-Th; uses added by Egor Gaydukov                                                  | dl-de/by-2-0 |
+| Pedestrian network                            | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar                                                                             |              |
+| Land use per plot (parks)                     | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar                                                                             |              |
+| Census grid                                   | Zensus 2022, 100 m grid, © Statistische Ämter des Bundes und der Länder                                                      | dl-de/by-2-0 |
 | Terrain (`terrain.json`, not part of the kit) | Digital terrain model DGM1 of Thuringia, airborne laser scan 2020, © GDI-Th; averaged to a 5 m grid by `scripts/terrain.mjs` | dl-de/by-2-0 |
 
 Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedestrian network: Egor Gaydukov, InfAU, Bauhaus-Universität Weimar. Census grid: Zensus 2022, © Statistische Ämter des Bundes und der Länder (dl-de/by-2-0). Terrain: digital terrain model DGM1 © GDI-Th (dl-de/by-2-0).
@@ -64,6 +64,6 @@ Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedest
 ## How this was made
 
 1. Tools: Claude Code, with the model Claude Opus 5.5.
-2. I decided:
-3. The agent did: read the data and `SOURCES.md`, then wrote the 3D city, the walking and resident calculation, the panel and this README, and checked the page in a headless browser. Later it replaced the walking areas with the A* search replay and the first-person walk.
-4. I checked:
+2. I decided: To vizualize a walkthrough in first person view to get an idea on how a walking route could go. Also I wanted to showcase the algorythm that decides the route, in this case: A\*.
+3. The agent did: read the data and `SOURCES.md`, then wrote the 3D city, the walking and resident calculation, the panel and this README, and checked the page in a headless browser. Later it replaced the walking areas with the A\* search replay and the first-person walk.
+4. I checked: That the model was a close representation of the city by adding topography and trees as pointclouds to represent the parks, and the visual experience was enjoyable.
