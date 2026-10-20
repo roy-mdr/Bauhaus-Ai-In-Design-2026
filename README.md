@@ -8,6 +8,8 @@ A 3D map of central Weimar that shows how far you can walk in 5, 10 and 15 minut
 - Click on the ground (or on a building) to start a walk. The app draws three nested areas in three shades of orange: dark for 5, middle for 10, light for 15 minutes. Buildings touching an area take its shade.
 - The panel lists, for each of the three times, the number of buildings reached and about how many residents live in the area.
 - Drag to orbit, right-drag to pan, scroll to zoom.
+- A menu bar at the top switches between **Walking reach** and **City growth**.
+- In **City growth**, click a point to start a new development: buildings near it gain storeys, and the gain fades to none at the edge of the chosen radius (100 to 800 m). The bar sets the radius, the storeys added at the centre (1 to 20) and the shape of the gradient (even, soft edge, sharp peak). Buildings rise with a short animation and turn magenta, the darker the more storeys they gain. The panel shows how many buildings are raised, the storeys and floor area added, and the tallest building.
 
 ## Run it
 
@@ -28,6 +30,8 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 - **Buildings:** a building counts when its footprint touches the area, that is when it lies within 25 m of a reached piece of street. A building touching the 5-minute area also counts for 10 and 15 minutes.
 - **Residents:** from the Zensus 2022 grid of 100 m cells. For every cell that overlaps the area, its population times the share of the cell's area that lies inside the area. These are added up and rounded to the nearest 10.
 - **Cells without a figure:** some cells have no published population (`null`). They are not zero: they are left out of the sum, and the panel shows next to it how many such cells overlap the area.
+
+- **City growth:** distance is measured from the chosen point to the middle of each building's footprint. Added storeys = storeys at the centre × gradient(1 − distance / radius), rounded to whole storeys of 3 m. New floor area = footprint × added storeys. This is a sketch of density, not a planning calculation: it ignores setbacks, structure, daylight and building rules.
 
 ## Limits
 

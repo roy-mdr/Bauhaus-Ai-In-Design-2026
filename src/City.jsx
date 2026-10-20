@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
-import { colorForUse, REACH_COLORS, GROUND_COLOR, STREET_COLOR } from './colors.js'
+import { colorForUse, REACH_COLORS, GROWTH_COLOR, GROUND_COLOR, STREET_COLOR } from './colors.js'
 
 // The scene is built in metres with x to the east, y to the north and z up.
 // One rotation of the whole group turns it into three.js's "y is up".
@@ -50,21 +50,48 @@ function buildingsGeometry(buildings) {
   return { geometry, ranges }
 }
 
-function Buildings({ buildings, buildingLevel, onPick }) {
+function Buildings({ buildings, buildingLevel, growth, onPick }) {
   const { geometry, ranges } = useMemo(() => buildingsGeometry(buildings), [buildings])
   const useColors = useMemo(() => buildings.map((b) => new THREE.Color(colorForUse(b.use))), [buildings])
   const reachColors = useMemo(() => REACH_COLORS.map((c) => new THREE.Color(c)), [])
+  const growthColor = useMemo(() => new THREE.Color(GROWTH_COLOR), [])
+  // The original heights of the vertices (0 at the ground, the building height on top),
+  // and the height each building has gained on screen right now.
+  const baseZ = useMemo(() => geometry.attributes.position.array.filter((_, k) => k % 3 === 2), [geometry])
+  const shown = useMemo(() => new Float32Array(buildings.length), [buildings])
 
-  // Paint each building in its use colour, or in the shade of the smallest area it touches.
+  // Paint each building in its use colour, or in the shade of the smallest area it touches,
+  // or, in growth mode, tinted by how many storeys it gains.
   useEffect(() => {
     const colors = geometry.attributes.color
+    const c = new THREE.Color()
     ranges.forEach(([from, to], i) => {
       const level = buildingLevel ? buildingLevel[i] : -1
-      const c = level >= 0 ? reachColors[level] : useColors[i]
+      if (level >= 0) c.copy(reachColors[level])
+      else if (growth?.share[i] > 0) c.copy(useColors[i]).lerp(growthColor, 0.35 + 0.65 * growth.share[i])
+      else c.copy(useColors[i])
       for (let v = from; v < to; v++) colors.setXYZ(v, c.r, c.g, c.b)
     })
     colors.needsUpdate = true
-  }, [geometry, ranges, buildingLevel, useColors, reachColors])
+  }, [geometry, ranges, buildingLevel, growth, useColors, reachColors, growthColor])
+
+  // Each frame, move every building's roof a bit closer to its target height, so the city grows (or shrinks back) smoothly.
+  useFrame((_, dt) => {
+    const pos = geometry.attributes.position
+    const ease = Math.min(1, dt * 3)
+    let moved = false
+    ranges.forEach(([from, to], i) => {
+      const target = growth ? growth.added[i] : 0
+      if (shown[i] === target) return
+      shown[i] = Math.abs(target - shown[i]) < 0.05 ? target : shown[i] + (target - shown[i]) * ease
+      for (let v = from; v < to; v++) if (baseZ[v] > 0) pos.setZ(v, baseZ[v] + shown[i])
+      moved = true
+    })
+    if (moved) {
+      pos.needsUpdate = true
+      geometry.computeBoundingSphere()
+    }
+  })
 
   return (
     <mesh geometry={geometry} onClick={onPick}>
@@ -117,7 +144,31 @@ function ShopMarker({ building }) {
   )
 }
 
-export default function City({ city, size, reach, marked, onPick }) {
+// The growth radius as a ring on the ground, with a pin at its centre.
+function GrowthRing({ centre, radius }) {
+  const geometry = useMemo(() => {
+    const pts = []
+    for (let k = 0; k < 128; k++) {
+      const a = (k / 128) * Math.PI * 2
+      pts.push(centre[0] + radius * Math.cos(a), centre[1] + radius * Math.sin(a), 0)
+    }
+    return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+  }, [centre, radius])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  return (
+    <>
+      <lineLoop geometry={geometry} position={[0, 0, 0.8]} raycast={noRaycast} renderOrder={5}>
+        <lineBasicMaterial color={GROWTH_COLOR} transparent depthWrite={false} />
+      </lineLoop>
+      <mesh position={[...centre, 4]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast}>
+        <cylinderGeometry args={[6, 6, 8, 24]} />
+        <meshLambertMaterial color={GROWTH_COLOR} />
+      </mesh>
+    </>
+  )
+}
+
+export default function City({ city, size, reach, growth, marked, onPick }) {
   // Ignore clicks that end a drag (orbiting or panning).
   const pick = (e) => {
     e.stopPropagation()
@@ -139,7 +190,8 @@ export default function City({ city, size, reach, marked, onPick }) {
           <meshBasicMaterial color={GROUND_COLOR} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
         </mesh>
         <Streets edges={city.edges} />
-        <Buildings buildings={city.buildings} buildingLevel={reach?.buildingLevel} onPick={pick} />
+        <Buildings buildings={city.buildings} buildingLevel={reach?.buildingLevel} growth={growth} onPick={pick} />
+        {growth && <GrowthRing centre={growth.centre} radius={growth.radius} />}
         {reach?.levels?.map((l, level) => <Area key={level} polygons={l.polygons} level={level} />)}
         {marked != null && <ShopMarker building={city.buildings[marked]} />}
         {reach?.start && (

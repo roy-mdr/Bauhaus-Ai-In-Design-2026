@@ -31,3 +31,6 @@ export const REACH_COLORS = ['#b8431c', '#e2804f', '#f4bf9f']
 
 export const GROUND_COLOR = '#efede6'
 export const STREET_COLOR = '#8e8b83'
+
+// City growth: buildings that gain storeys are tinted towards this colour, the more the stronger.
+export const GROWTH_COLOR = '#a3195b'
