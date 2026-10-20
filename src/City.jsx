@@ -1,8 +1,11 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
-import { colorForUse, REACH_COLORS, GROWTH_COLOR, GROUND_COLOR, STREET_COLOR } from './colors.js'
+import {
+  colorForUse, REACH_COLORS, GROWTH_COLOR, GROUND_COLOR, STREET_COLOR,
+  NEW_SHADOW_COLOR, WIND_CALM, WIND_NORMAL, WIND_STRONG, WINDIER_COLOR, CALMER_COLOR,
+} from './colors.js'
 
 // The scene is built in metres with x to the east, y to the north and z up.
 // One rotation of the whole group turns it into three.js's "y is up".
@@ -94,7 +97,7 @@ function Buildings({ buildings, buildingLevel, growth, onPick }) {
   })
 
   return (
-    <mesh geometry={geometry} onClick={onPick}>
+    <mesh geometry={geometry} onClick={onPick} castShadow receiveShadow>
       <meshLambertMaterial vertexColors />
     </mesh>
   )
@@ -115,8 +118,8 @@ function Streets({ edges }) {
   )
 }
 
-// One walking area, drawn flat on the ground. Areas with a larger number of minutes lie underneath.
-function Area({ polygons, level }) {
+// Polygons drawn flat on the ground, in one colour.
+function FlatShape({ polygons, color, opacity, z, renderOrder }) {
   const geometry = useMemo(() => {
     const shapes = polygons.map(({ outer, holes }) => {
       const shape = new THREE.Shape(outer.map(([x, y]) => new THREE.Vector2(x, y)))
@@ -127,21 +130,143 @@ function Area({ polygons, level }) {
   }, [polygons])
   useEffect(() => () => geometry.dispose(), [geometry])
   return (
-    <mesh geometry={geometry} position={[0, 0, 0.3]} raycast={noRaycast} renderOrder={3 - level}>
-      <meshBasicMaterial color={REACH_COLORS[level]} transparent opacity={0.85} depthWrite={false} side={THREE.DoubleSide} />
+    <mesh geometry={geometry} position={[0, 0, z]} raycast={noRaycast} renderOrder={renderOrder}>
+      <meshBasicMaterial color={color} transparent opacity={opacity} depthWrite={false} side={THREE.DoubleSide} />
     </mesh>
   )
 }
 
-// A pin floating above the shop picked in the list.
-function ShopMarker({ building }) {
-  const { minX, minY, maxX, maxY } = building.bbox
+// One walking area. Areas with a larger number of minutes lie underneath.
+const Area = ({ polygons, level }) => (
+  <FlatShape polygons={polygons} color={REACH_COLORS[level]} opacity={0.85} z={0.3} renderOrder={3 - level} />
+)
+
+// The sun as a light that casts shadows. Its direction comes from height and compass direction.
+function Sun({ sun, size }) {
+  const a = (sun.azimuth * Math.PI) / 180, h = (sun.altitude * Math.PI) / 180
+  const far = 2500
+  // three.js has y up and north towards -z.
+  const position = [Math.sin(a) * Math.cos(h) * far, Math.sin(h) * far, -Math.cos(a) * Math.cos(h) * far]
+  const half = Math.hypot(...size) / 2 + 50
+  // The shadow camera only takes its new size once told to.
+  const light = useRef()
+  useLayoutEffect(() => light.current.shadow.camera.updateProjectionMatrix(), [half])
   return (
-    <mesh position={[(minX + maxX) / 2, (minY + maxY) / 2, building.height + 14]} rotation={[-Math.PI / 2, 0, 0]} raycast={noRaycast}>
-      <coneGeometry args={[7, 20, 24]} />
-      <meshLambertMaterial color="#5a1d08" />
+    <directionalLight ref={light} position={position} intensity={1.8} castShadow
+      shadow-mapSize={[4096, 4096]} shadow-bias={-0.0004} shadow-normalBias={0.5}
+      shadow-camera-left={-half} shadow-camera-right={half} shadow-camera-top={half} shadow-camera-bottom={-half}
+      shadow-camera-near={10} shadow-camera-far={far * 2}
+    />
+  )
+}
+
+// The wind as short moving streaks at street level, coloured by speed: pale blue calm, dark blue normal, red strong.
+const PARTICLES = 4000
+const STREAK_SPEED = 30 // on-screen metres per second for wind as strong as over open ground; much faster than real
+
+function WindStreaks({ base, speed }) {
+  const { geometry, state } = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(PARTICLES * 6), 3))
+    g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(PARTICLES * 6), 3))
+    const f = () => new Float32Array(PARTICLES)
+    return { geometry: g, state: { x: f(), y: f(), life: f(), maxLife: f() } }
+  }, [])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  const palette = useMemo(() => [WIND_CALM, WIND_NORMAL, WIND_STRONG, GROUND_COLOR].map((c) => new THREE.Color(c)), [])
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05)
+    const { nx, ny, x0, y0, cell, vx, vy } = base
+    const { x, y, life, maxLife } = state
+    const pos = geometry.attributes.position, col = geometry.attributes.color
+    const [calm, normal, strong, ground] = palette
+    const c = new THREE.Color(), tail = new THREE.Color()
+    for (let p = 0; p < PARTICLES; p++) {
+      if (life[p] >= maxLife[p]) {
+        const first = maxLife[p] === 0 // at the start, spread the streaks over their lifetimes
+        x[p] = x0 + Math.random() * nx * cell
+        y[p] = y0 + Math.random() * ny * cell
+        maxLife[p] = 3 + Math.random() * 5
+        life[p] = first ? Math.random() * maxLife[p] : 0
+      }
+      life[p] += dt
+      const i = Math.floor((x[p] - x0) / cell), j = Math.floor((y[p] - y0) / cell)
+      const k = j * nx + i
+      const s = i >= 0 && i < nx && j >= 0 && j < ny ? speed[k] : 0
+      const len = Math.hypot(vx[k], vy[k])
+      if (s === 0 || len === 0) {
+        life[p] = maxLife[p] // inside a building, off the map or in still air: start again elsewhere
+        pos.setXYZ(2 * p, 0, 0, -10)
+        pos.setXYZ(2 * p + 1, 0, 0, -10)
+        continue
+      }
+      const dx = vx[k] / len, dy = vy[k] / len
+      x[p] += dx * s * STREAK_SPEED * dt
+      y[p] += dy * s * STREAK_SPEED * dt
+      const t = 6 + 12 * s
+      pos.setXYZ(2 * p, x[p], y[p], 0)
+      pos.setXYZ(2 * p + 1, x[p] - dx * t, y[p] - dy * t, 0)
+      if (s < 1) c.copy(calm).lerp(normal, s)
+      else c.copy(normal).lerp(strong, Math.min(1, (s - 1) / 0.6))
+      // Fade in and out, so streaks don't pop.
+      const fade = Math.min(1, life[p] / 0.6, (maxLife[p] - life[p]) / 0.6)
+      c.lerp(ground, 1 - fade)
+      tail.copy(c).lerp(ground, 0.7)
+      col.setXYZ(2 * p, c.r, c.g, c.b)
+      col.setXYZ(2 * p + 1, tail.r, tail.g, tail.b)
+    }
+    pos.needsUpdate = true
+    col.needsUpdate = true
+  })
+
+  return (
+    <lineSegments geometry={geometry} position={[0, 0, 2]} raycast={noRaycast} renderOrder={6} frustumCulled={false}>
+      <lineBasicMaterial vertexColors transparent depthWrite={false} />
+    </lineSegments>
+  )
+}
+
+// A grid of coloured cells laid on the ground. `paint(k)` gives each cell's [color, opacity 0–1], or nothing.
+function GridLayer({ grid, paint, z, renderOrder }) {
+  const { nx, ny, x0, y0, cell } = grid
+  const texture = useMemo(() => {
+    const data = new Uint8Array(nx * ny * 4)
+    for (let k = 0; k < nx * ny; k++) {
+      const p = paint(k)
+      if (p) data.set([p[0].r * 255, p[0].g * 255, p[0].b * 255, p[1] * 255], k * 4)
+    }
+    const t = new THREE.DataTexture(data, nx, ny)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.needsUpdate = true
+    return t
+  }, [paint, nx, ny])
+  useEffect(() => () => texture.dispose(), [texture])
+  return (
+    <mesh position={[x0 + (nx * cell) / 2, y0 + (ny * cell) / 2, z]} raycast={noRaycast} renderOrder={renderOrder}>
+      <planeGeometry args={[nx * cell, ny * cell]} />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} />
     </mesh>
   )
+}
+
+// Where the growth made street-level wind stronger (red) or weaker (blue).
+function WindChange({ base, change }) {
+  const paint = useMemo(() => {
+    const up = new THREE.Color(WINDIER_COLOR), down = new THREE.Color(CALMER_COLOR)
+    // The same cells the panel counts: more than 10 % faster or slower.
+    return (k) => Math.abs(change[k]) > 0.1 && [change[k] > 0 ? up : down, 0.3 + 0.4 * Math.min(1, Math.abs(change[k]) / 0.6)]
+  }, [change])
+  return <GridLayer grid={base} paint={paint} z={0.5} renderOrder={1} />
+}
+
+// Ground that the raised buildings newly put in shade.
+function NewShadow({ grid, mask }) {
+  const paint = useMemo(() => {
+    const c = new THREE.Color(NEW_SHADOW_COLOR)
+    return (k) => mask[k] && [c, 0.65]
+  }, [mask])
+  return <GridLayer grid={grid} paint={paint} z={0.5} renderOrder={2} />
 }
 
 // The growth radius as a ring on the ground, with a pin at its centre.
@@ -168,7 +293,7 @@ function GrowthRing({ centre, radius }) {
   )
 }
 
-export default function City({ city, size, reach, growth, marked, onPick }) {
+export default function City({ city, size, reach, growth, sun, newShadow, wind, marked, onPick }) {
   // Ignore clicks that end a drag (orbiting or panning).
   const pick = (e) => {
     e.stopPropagation()
@@ -179,16 +304,26 @@ export default function City({ city, size, reach, growth, marked, onPick }) {
   const distance = Math.max(w, h) * 0.9
 
   return (
-    <Canvas flat camera={{ position: [0, distance, distance * 0.9], fov: 40, near: 2, far: 20000 }} dpr={[1, 2]}>
+    <Canvas flat shadows camera={{ position: [0, distance, distance * 0.9], fov: 40, near: 10, far: 20000 }} dpr={[1, 2]}>
       <color attach="background" args={['#f7f6f2']} />
       <ambientLight intensity={1.6} />
-      <directionalLight position={[-600, 1200, 800]} intensity={1.8} />
+      {sun ? <Sun sun={sun} size={size} /> : <directionalLight position={[-600, 1200, 800]} intensity={1.8} />}
       <OrbitControls makeDefault maxPolarAngle={Math.PI / 2.1} minDistance={50} maxDistance={6000} />
       <group rotation={TO_Y_UP}>
         <mesh onClick={pick} renderOrder={0}>
           <planeGeometry args={[w + 600, h + 600]} />
           <meshBasicMaterial color={GROUND_COLOR} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
         </mesh>
+        {sun && (
+          // Catches the cast shadows on the ground, and is see-through everywhere else.
+          <mesh position={[0, 0, 0.5]} receiveShadow raycast={noRaycast} renderOrder={1}>
+            <planeGeometry args={[w + 600, h + 600]} />
+            <shadowMaterial opacity={0.45} transparent depthWrite={false} />
+          </mesh>
+        )}
+        {newShadow && <NewShadow grid={newShadow.grid} mask={newShadow.mask} />}
+        {wind?.change && <WindChange base={wind.base} change={wind.change} />}
+        {wind && <WindStreaks base={wind.base} speed={wind.speed} />}
         <Streets edges={city.edges} />
         <Buildings buildings={city.buildings} buildingLevel={reach?.buildingLevel} growth={growth} onPick={pick} />
         {growth && <GrowthRing centre={growth.centre} radius={growth.radius} />}

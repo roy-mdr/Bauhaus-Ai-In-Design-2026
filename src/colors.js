@@ -34,3 +34,11 @@ export const STREET_COLOR = '#8e8b83'
 
 // City growth: buildings that gain storeys are tinted towards this colour, the more the stronger.
 export const GROWTH_COLOR = '#a3195b'
+
+// Shadows and wind in growth mode.
+export const NEW_SHADOW_COLOR = '#3b2f8f'
+export const WIND_CALM = '#7ea7cf'
+export const WIND_NORMAL = '#1d4a78'
+export const WIND_STRONG = '#c8402a'
+export const WINDIER_COLOR = '#e0452b'
+export const CALMER_COLOR = '#1f9e89'

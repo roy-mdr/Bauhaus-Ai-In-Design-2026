@@ -8,8 +8,10 @@ A 3D map of central Weimar that shows how far you can walk in 5, 10 and 15 minut
 - Click on the ground (or on a building) to start a walk. The app draws three nested areas in three shades of orange: dark for 5, middle for 10, light for 15 minutes. Buildings touching an area take its shade.
 - The panel lists, for each of the three times, the number of buildings reached and about how many residents live in the area.
 - Drag to orbit, right-drag to pan, scroll to zoom.
-- A menu bar at the top switches between **Walking reach** and **City growth**.
+- A menu bar at the top switches between **City growth** (the view the app opens with) and **Walking reach**.
 - In **City growth**, click a point to start a new development: buildings near it gain storeys, and the gain fades to none at the edge of the chosen radius (100 to 800 m). The bar sets the radius, the storeys added at the centre (1 to 20) and the shape of the gradient (even, soft edge, sharp peak). Buildings rise with a short animation and turn magenta, the darker the more storeys they gain. The panel shows how many buildings are raised, the storeys and floor area added, and the tallest building.
+- **Sun and shadows** (in growth mode): pick a day (21 March, 21 June, 23 September, 21 December) and a clock time. The buildings cast real shadows from the sun over Weimar, and ground that the raised buildings newly put in shade is marked in indigo, with its area in the panel.
+- **Wind at street level** (in growth mode, indicative, on by default): pick where the wind comes from. Moving streaks show the flow (pale blue calm, dark blue as in the open, red stronger), and the ground shows where the growth made the wind more than 10 % stronger (red) or weaker (teal), with both areas in the panel.
 
 ## Run it
 
@@ -32,6 +34,10 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 - **Cells without a figure:** some cells have no published population (`null`). They are not zero: they are left out of the sum, and the panel shows next to it how many such cells overlap the area.
 
 - **City growth:** distance is measured from the chosen point to the middle of each building's footprint. Added storeys = storeys at the centre × gradient(1 − distance / radius), rounded to whole storeys of 3 m. New floor area = footprint × added storeys. This is a sketch of density, not a planning calculation: it ignores setbacks, structure, daylight and building rules.
+
+- **Sun:** the sun's height and direction are worked out from the date, clock time (with summer time) and the kit's centre, with a standard astronomical formula. Below 3° above the horizon the sun counts as down.
+- **New shadow:** on a grid of 2 m cells, each building's footprint is swept away from the sun by its height. New shadow is ground in shade after the growth that was not in shade before, and not under a building. Shade on roofs and walls is not counted.
+- **Wind (indicative):** on a grid of 5 m cells. Air flows around the footprints as in a 2D "potential flow"; closed courtyards stay calm; each building shelters about four times its height downwind (at most 150 m), with the wind up to 65 % weaker right behind it; a building above 15 m and taller than the average of its neighbours within 150 m speeds the wind up at the foot of its windward face and around its side corners, up to 80 % faster. These are rules of thumb, not a wind simulation (CFD): it knows nothing about gusts, wind over roofs, trees or real wind statistics. Use it to see where to look closer, not to judge comfort or safety.
 
 ## Limits
 
