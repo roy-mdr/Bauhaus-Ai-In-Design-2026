@@ -35,8 +35,8 @@ export const PARK_COLOR = '#cfe0bf'
 export const BACKGROUND_COLOR = '#f7f6f2'
 
 // While a route is shown the city fades to night, so the search glows.
-// `trees` dims the tree colours a little, so they stay green at night.
-export const NIGHT = { background: '#0d1018', ground: '#161a26', street: '#343b52', buildings: '#5d6478', park: '#1a2b22', trees: '#9db8a6' }
+// `terrain`, `buildings` and `trees` darken their own colours; `trees` only a little, so they stay green at night.
+export const NIGHT = { background: '#0d1018', terrain: '#2a3042', street: '#343b52', buildings: '#5d6478', trees: '#9db8a6' }
 
 // The search and the route.
 export const ROUTE_COLORS = {

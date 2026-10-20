@@ -3,6 +3,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { colorForUse, GROUND_COLOR, STREET_COLOR, PARK_COLOR, BACKGROUND_COLOR, NIGHT, ROUTE_COLORS } from './colors.js'
+import { drape } from './terrain.js'
+import { insideRing } from './reach.js'
 
 // The scene is built in metres with x to the east, y to the north and z up.
 // One rotation of the whole group turns it into three.js's "y is up".
@@ -26,7 +28,9 @@ const WALK_FOV = 75
 
 // All buildings in one mesh: walls and flat roofs from footprint and height.
 // `ranges` remembers which vertices belong to which building, so we can light them up.
-function buildingsGeometry(buildings) {
+// On a slope the walls start a metre below the lowest ground under the footprint, so no building
+// floats, and the roof is `height` above the average ground under it.
+function buildingsGeometry(buildings, terrain) {
   const pos = [], nor = [], col = [], ranges = []
   const push = (x, y, z, nx, ny, nz, c) => {
     pos.push(x, y, z)
@@ -35,7 +39,9 @@ function buildingsGeometry(buildings) {
   }
   for (const b of buildings) {
     const c = new THREE.Color(colorForUse(b.use))
-    const h = b.height
+    const grounds = b.rings[0].map(([x, y]) => terrain.heightAt(x, y))
+    const floor = Math.min(...grounds) - 1
+    const h = grounds.reduce((a, g) => a + g, 0) / grounds.length + b.height
     const start = pos.length / 3
     let [outer, ...holes] = b.rings.map((r) => r.map(([x, y]) => new THREE.Vector2(x, y)))
     if (THREE.ShapeUtils.isClockWise(outer)) outer.reverse()
@@ -46,8 +52,8 @@ function buildingsGeometry(buildings) {
         const p = ring[i], q = ring[(i + 1) % ring.length]
         const len = Math.hypot(q.x - p.x, q.y - p.y) || 1
         const nx = (q.y - p.y) / len, ny = -(q.x - p.x) / len
-        push(p.x, p.y, 0, nx, ny, 0, c); push(q.x, q.y, 0, nx, ny, 0, c); push(q.x, q.y, h, nx, ny, 0, c)
-        push(p.x, p.y, 0, nx, ny, 0, c); push(q.x, q.y, h, nx, ny, 0, c); push(p.x, p.y, h, nx, ny, 0, c)
+        push(p.x, p.y, floor, nx, ny, 0, c); push(q.x, q.y, floor, nx, ny, 0, c); push(q.x, q.y, h, nx, ny, 0, c)
+        push(p.x, p.y, floor, nx, ny, 0, c); push(q.x, q.y, h, nx, ny, 0, c); push(p.x, p.y, h, nx, ny, 0, c)
       }
     }
 
@@ -88,8 +94,8 @@ function glowingLambert() {
   return material
 }
 
-function Buildings({ buildings, materials, highlights, onPick }) {
-  const { geometry, ranges } = useMemo(() => buildingsGeometry(buildings), [buildings])
+function Buildings({ buildings, terrain, materials, highlights, onPick }) {
+  const { geometry, ranges } = useMemo(() => buildingsGeometry(buildings, terrain), [buildings, terrain])
   const material = useMemo(glowingLambert, [])
   materials.buildings = material
 
@@ -138,34 +144,67 @@ function Buildings({ buildings, materials, highlights, onPick }) {
   return <mesh geometry={geometry} material={material} onClick={onPick} />
 }
 
-function Streets({ edges, materials }) {
+// How far above the ground each line and strip floats, so it is not hidden in the ground.
+const LIFT = { street: 0.5, explored: 0.7, halo: 0.8, path: 0.9 }
+
+function Streets({ edges, terrain, materials }) {
   const geometry = useMemo(() => {
     const pos = []
-    for (const e of edges)
-      for (let i = 1; i < e.points.length; i++) pos.push(...e.points[i - 1], 0, ...e.points[i], 0)
+    for (const e of edges) {
+      const line = drape(terrain, e.points, LIFT.street)
+      for (let i = 1; i < line.length; i++) pos.push(...line[i - 1], ...line[i])
+    }
     return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  }, [edges])
+  }, [edges, terrain])
   return (
-    <lineSegments geometry={geometry} position={[0, 0, 0.6]} raycast={noRaycast} renderOrder={4}>
+    <lineSegments geometry={geometry} raycast={noRaycast} renderOrder={4}>
       {/* "transparent" puts the streets in the same drawing pass as the route, before it */}
       <lineBasicMaterial color={STREET_COLOR} transparent depthWrite={false} ref={(m) => { materials.street = m }} />
     </lineSegments>
   )
 }
 
-// The parks: green ground, drawn just above the plain ground.
-function ParkGround({ parks, materials }) {
+// The ground: one surface through all the terrain grid points, shaded by the light so slopes show,
+// pale where it is plain ground and green inside the parks.
+function Ground({ terrain, parks, materials, onPick }) {
   const geometry = useMemo(() => {
-    const shapes = parks.map(([outer, ...holes]) => {
-      const shape = new THREE.Shape(outer.map(([x, y]) => new THREE.Vector2(x, y)))
-      shape.holes = holes.map((h) => new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y))))
-      return shape
+    const { x0, y0, step, cols, rows, heights } = terrain
+    const pos = new Float32Array(cols * rows * 3), col = new Float32Array(cols * rows * 3)
+    const plain = new THREE.Color(GROUND_COLOR), park = new THREE.Color(PARK_COLOR)
+    const boxes = parks.map(([outer]) => {
+      let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity]
+      for (const [x, y] of outer) [minX, minY, maxX, maxY] = [Math.min(minX, x), Math.min(minY, y), Math.max(maxX, x), Math.max(maxY, y)]
+      return { minX, minY, maxX, maxY }
     })
-    return new THREE.ShapeGeometry(shapes)
-  }, [parks])
+    const inPark = (p) =>
+      parks.some(([outer, ...holes], k) => {
+        const b = boxes[k]
+        return p[0] >= b.minX && p[0] <= b.maxX && p[1] >= b.minY && p[1] <= b.maxY && insideRing(p, outer) && !holes.some((h) => insideRing(p, h))
+      })
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++) {
+        const k = r * cols + c, x = x0 + c * step, y = y0 + r * step
+        pos.set([x, y, heights[k]], k * 3)
+        const tint = inPark([x, y]) ? park : plain
+        col.set([tint.r, tint.g, tint.b], k * 3)
+      }
+    const index = []
+    for (let r = 0; r < rows - 1; r++)
+      for (let c = 0; c < cols - 1; c++) {
+        const a = r * cols + c, b = a + 1, d = a + cols, e = d + 1
+        index.push(a, b, e, a, e, d)
+      }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3))
+    g.setIndex(index)
+    g.computeVertexNormals()
+    return g
+  }, [terrain, parks])
   return (
-    <mesh geometry={geometry} position={[0, 0, 0.1]} raycast={noRaycast} renderOrder={1}>
-      <meshBasicMaterial color={PARK_COLOR} ref={(m) => { materials.park = m }} />
+    <mesh geometry={geometry} onClick={onPick} renderOrder={0}>
+      {/* the material colour tints the whole ground at once, for the night fade */}
+      <meshLambertMaterial vertexColors polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} ref={(m) => { materials.terrain = m }} />
     </mesh>
   )
 }
@@ -173,22 +212,23 @@ function ParkGround({ parks, materials }) {
 // The trees as one point cloud. Each point is a round dot about half a metre wide, never smaller
 // than a pixel and a half, so the parks still read from far away, and never larger than 14 pixels,
 // so crowns close to the camera stay leafy instead of turning into large discs. The crowns sway a little in the wind.
-function Trees({ positions, colors, materials }) {
+function Trees({ positions, colors, lifts, materials }) {
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    g.setAttribute('aLift', new THREE.BufferAttribute(lifts, 1))
     g.computeBoundingSphere()
     return g
-  }, [positions, colors])
+  }, [positions, colors, lifts])
   const material = useMemo(() => {
     const m = new THREE.PointsMaterial({ size: 0.55, sizeAttenuation: true, vertexColors: true })
     m.userData.time = { value: 0 }
     m.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = m.userData.time
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.xy += sin(uTime * 1.3 + position.x * 0.2 + position.y * 0.15) * 0.02 * position.z;')
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nattribute float aLift;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.xy += sin(uTime * 1.3 + position.x * 0.2 + position.y * 0.15) * 0.02 * aLift;')
         .replace('#include <logdepthbuf_vertex>', 'gl_PointSize = clamp(gl_PointSize, 1.5, 14.0);\n#include <logdepthbuf_vertex>')
       shader.fragmentShader = shader.fragmentShader.replace('void main() {', 'void main() {\n  if (length(gl_PointCoord - 0.5) > 0.5) discard;')
     }
@@ -204,7 +244,7 @@ function Trees({ positions, colors, materials }) {
 // Fades the city between day and night: night while a route is shown, so the search glows.
 function NightFade({ on, materials }) {
   const night = useRef(0)
-  const day = useMemo(() => ({ background: new THREE.Color(BACKGROUND_COLOR), ground: new THREE.Color(GROUND_COLOR), street: new THREE.Color(STREET_COLOR), buildings: new THREE.Color('#ffffff'), park: new THREE.Color(PARK_COLOR), trees: new THREE.Color('#ffffff') }), [])
+  const day = useMemo(() => ({ background: new THREE.Color(BACKGROUND_COLOR), terrain: new THREE.Color('#ffffff'), street: new THREE.Color(STREET_COLOR), buildings: new THREE.Color('#ffffff'), trees: new THREE.Color('#ffffff') }), [])
   const dark = useMemo(() => Object.fromEntries(Object.entries(NIGHT).map(([k, c]) => [k, new THREE.Color(c)])), [])
   useFrame(({ scene }, dt) => {
     const before = night.current
@@ -212,28 +252,39 @@ function NightFade({ on, materials }) {
     if (Math.abs(before - night.current) < 1e-4) return
     const k = night.current
     scene.background?.lerpColors(day.background, dark.background, k)
-    for (const key of ['ground', 'street', 'buildings', 'park', 'trees']) materials[key]?.color.lerpColors(day[key], dark[key], k)
+    for (const key of ['terrain', 'street', 'buildings', 'trees']) materials[key]?.color.lerpColors(day[key], dark[key], k)
   })
   return null
 }
 
-// Flat strips on the ground along lines. `values` holds one number per point, which the
-// shaders read: the moment an edge lights up, or the distance along the route.
-// Each piece runs on by half a width at both ends, so corners have no gaps.
-function ribbonGeometry(lines, width, z) {
+// Strips lying on the ground along lines, following the slopes. `values` holds one number per point,
+// which the shaders read: the moment an edge lights up, or the distance along the route.
+// At corners and ends each piece runs on by half a width, so corners have no gaps. Along a straight
+// stretch it doesn't, or the see-through pieces would overlap and show darker bands.
+function ribbonGeometry(lines, width, lift, terrain) {
   const pos = [], val = []
-  for (const { points, values } of lines)
+  const direction = (a, b) => {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+    return len === 0 ? null : [(b[0] - a[0]) / len, (b[1] - a[1]) / len]
+  }
+  const turns = (u, v) => !u || !v || u[0] * v[0] + u[1] * v[1] < 0.999
+  for (const line of lines) {
+    const { points, values } = drape(terrain, line.points, lift, terrain.step, line.values)
     for (let i = 1; i < points.length; i++) {
-      const [ax, ay] = points[i - 1], [bx, by] = points[i]
-      const len = Math.hypot(bx - ax, by - ay)
-      if (len === 0) continue
-      const dx = ((bx - ax) / len) * (width / 2), dy = ((by - ay) / len) * (width / 2)
-      const [sx, sy, ex, ey] = [ax - dx, ay - dy, bx + dx, by + dy]
+      const [ax, ay, az] = points[i - 1], [bx, by, bz] = points[i]
+      const here = direction(points[i - 1], points[i])
+      if (!here) continue
+      const before = i > 1 ? direction(points[i - 2], points[i - 1]) : null
+      const after = i < points.length - 1 ? direction(points[i], points[i + 1]) : null
+      const dx = here[0] * (width / 2), dy = here[1] * (width / 2)
+      const [rs, re] = [turns(before, here) ? 1 : 0, turns(here, after) ? 1 : 0]
+      const [sx, sy, ex, ey] = [ax - dx * rs, ay - dy * rs, bx + dx * re, by + dy * re]
       const [va, vb] = [values[i - 1], values[i]]
-      pos.push(sx - dy, sy + dx, z, sx + dy, sy - dx, z, ex - dy, ey + dx, z)
-      pos.push(ex - dy, ey + dx, z, sx + dy, sy - dx, z, ex + dy, ey - dx, z)
+      pos.push(sx - dy, sy + dx, az, sx + dy, sy - dx, az, ex - dy, ey + dx, bz)
+      pos.push(ex - dy, ey + dx, bz, sx + dy, sy - dx, az, ex + dy, ey - dx, bz)
       val.push(va, va, vb, vb, va, vb)
     }
+  }
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
   geometry.setAttribute('aValue', new THREE.Float32BufferAttribute(val, 1))
@@ -344,8 +395,10 @@ function pointAlong(route, d) {
 
 // The replay of the search, the route, and the first-person walk along it.
 // It is mounted afresh for every route, so its clock starts at zero.
-function RouteShow({ city, route, walkCmd, onPhase, progressRef }) {
+function RouteShow({ city, terrain, route, walkCmd, onPhase, progressRef }) {
   const { camera, scene, controls } = useThree()
+  // A point on the ground, in the scene, `above` metres over it.
+  const onGround = (p, above = 0) => toWorld(p, terrain.heightAt(p[0], p[1]) + above)
 
   const show = useMemo(() => {
     // Replay speed: about four seconds for a long search, never slower than 60 steps a second.
@@ -360,17 +413,21 @@ function RouteShow({ city, route, walkCmd, onPhase, progressRef }) {
         return { points, values: along.map((a) => step / rate + (GROW_S * a) / total) }
       }),
       2.2,
-      0.35,
+      LIFT.explored,
+      terrain,
     )
     const pathLine = [{ points: route.points, values: route.along }]
-    const path = ribbonGeometry(pathLine, 4.5, 0.5)
-    const halo = ribbonGeometry(pathLine, 16, 0.45)
-    const guide = ribbonGeometry(pathLine, 0.8, 0.5) // seen from eye height, the wide strip would fill the street
+    const path = ribbonGeometry(pathLine, 4.5, LIFT.path, terrain)
+    const halo = ribbonGeometry(pathLine, 16, LIFT.halo, terrain)
+    const guide = ribbonGeometry(pathLine, 0.8, LIFT.path, terrain) // seen from eye height, the wide strip would fill the street
 
     const popStep = new Map(route.expanded.map((n, i) => [n, i]))
     const ids = [...city.neighbours.keys()]
     const nodes = new THREE.BufferGeometry()
-    nodes.setAttribute('position', new THREE.Float32BufferAttribute(ids.flatMap((id) => [...city.nodeXY.get(id), 1]), 3))
+    nodes.setAttribute('position', new THREE.Float32BufferAttribute(ids.flatMap((id) => {
+      const [x, y] = city.nodeXY.get(id)
+      return [x, y, terrain.heightAt(x, y) + 1.5]
+    }), 3))
     nodes.setAttribute('aPush', new THREE.Float32BufferAttribute(ids.map((id) => (route.pushStep.has(id) ? route.pushStep.get(id) / rate + GROW_S : 1e6)), 1))
     nodes.setAttribute('aPop', new THREE.Float32BufferAttribute(ids.map((id) => (popStep.has(id) ? popStep.get(id) / rate : 1e6)), 1))
 
@@ -389,10 +446,11 @@ function RouteShow({ city, route, walkCmd, onPhase, progressRef }) {
     for (const [x, y] of route.points) [minX, minY, maxX, maxY] = [Math.min(minX, x), Math.min(minY, y), Math.max(maxX, x), Math.max(maxY, y)]
     const [cx, cy] = [(minX + maxX) / 2, (minY + maxY) / 2]
     const distance = Math.max(300, Math.max(maxX - minX, maxY - minY) * 1.4)
-    const overview = { position: toWorld([cx, cy - distance * 0.8], distance), target: toWorld([cx, cy]) }
+    const ground = terrain.heightAt(cx, cy)
+    const overview = { position: toWorld([cx, cy - distance * 0.8], ground + distance), target: toWorld([cx, cy], ground) }
 
     return { rate, searchEnd, explored, path, halo, guide, nodes, materials, overview }
-  }, [city, route])
+  }, [city, terrain, route])
 
   useEffect(
     () => () => {
@@ -478,7 +536,7 @@ function RouteShow({ city, route, walkCmd, onPhase, progressRef }) {
     materials.nodes.uniforms.uPixels.value = (state.size.height * state.viewport.dpr) / (2 * Math.tan((camera.fov * Math.PI) / 360))
     for (const m of [materials.path, materials.halo]) m.uniforms.uDraw.value = drawn
     for (const m of [materials.path, materials.halo, materials.guide]) m.uniforms.uTime.value = c.t
-    const low = camera.position.y < LOW_M
+    const low = camera.position.y - terrain.heightAt(camera.position.x, -camera.position.z) < LOW_M
     if (pathMesh.current) pathMesh.current.visible = c.t > searchEnd && !low
     if (guideMesh.current) guideMesh.current.visible = c.t > searchEnd && low
 
@@ -503,18 +561,19 @@ function RouteShow({ city, route, walkCmd, onPhase, progressRef }) {
     if (w.stage === 'in') {
       // Fly down from where the camera is to eye height at the origin.
       const k = ease(clamp01(w.t / FLY_S))
-      const eye = toWorld(glidePoint(route, 0), EYE_M)
-      const target = toWorld(pointAlong(route, LOOK_AHEAD_M), EYE_M)
+      const eye = onGround(glidePoint(route, 0), EYE_M)
+      const target = onGround(pointAlong(route, LOOK_AHEAD_M), EYE_M)
       camera.position.lerpVectors(w.fromPos, eye, k)
       look.lerpVectors(w.fromLook, target, k)
       camera.lookAt(look)
       setLens(OVERVIEW_FOV + (WALK_FOV - OVERVIEW_FOV) * k, 0.1, 4000)
       if (w.t >= FLY_S) Object.assign(w, { stage: 'walk', t: 0, dir: target.sub(eye).normalize() })
     } else if (w.stage === 'walk') {
-      // Glide along the route at eye height, with rounded corners; the gaze turns smoothly towards a point further ahead.
+      // Glide along the route at eye height above the ground, so up and down the slopes, with rounded
+      // corners; the gaze turns smoothly towards a point further ahead, also at eye height.
       w.d = Math.min(length, w.d + WALK_M_PER_S * dt)
-      const eye = toWorld(glidePoint(route, w.d), EYE_M)
-      ahead.copy(toWorld(pointAlong(route, w.d + LOOK_AHEAD_M), EYE_M)).sub(eye)
+      const eye = onGround(glidePoint(route, w.d), EYE_M)
+      ahead.copy(onGround(pointAlong(route, w.d + LOOK_AHEAD_M), EYE_M)).sub(eye)
       if (ahead.length() > 0.5) w.dir.lerp(ahead.normalize(), 1 - Math.exp(-3 * dt)).normalize()
       camera.position.copy(eye)
       camera.lookAt(look.copy(eye).add(w.dir))
@@ -547,16 +606,18 @@ function RouteShow({ city, route, walkCmd, onPhase, progressRef }) {
 // A marker for the origin or the destination: a large sphere that pops in on a glowing pillar,
 // a ring pulsing outwards on the ground and a label. If the street corner is away from the
 // click, a small dot and a line join the two, so you see where you clicked and where the route starts.
-function Beacon({ point, color: hex, label }) {
+function Beacon({ point, terrain, color: hex, label }) {
   const { xy, click } = point
   const ring = useRef()
   const ball = useRef()
   const born = useRef(null)
   const seen = useMemo(() => new THREE.Vector3(), [])
+  const ground = terrain.heightAt(xy[0], xy[1])
+  const clickZ = terrain.heightAt(click[0], click[1]) - ground + 1.2 // the click's own ground, relative to the marker
   const lead = useMemo(() => {
     if (Math.hypot(click[0] - xy[0], click[1] - xy[1]) < 3) return null
-    return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([click[0] - xy[0], click[1] - xy[1], 1.2, 0, 0, 1.2], 3))
-  }, [xy, click])
+    return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([click[0] - xy[0], click[1] - xy[1], clickZ, 0, 0, 1.2], 3))
+  }, [xy, click, clickZ])
 
   useFrame(({ clock, camera }) => {
     born.current ??= clock.elapsedTime
@@ -574,7 +635,7 @@ function Beacon({ point, color: hex, label }) {
   })
 
   return (
-    <group position={[xy[0], xy[1], 0]}>
+    <group position={[xy[0], xy[1], ground]}>
       <mesh position={[0, 0, 45]} rotation={[Math.PI / 2, 0, 0]} raycast={noRaycast} renderOrder={9}>
         <cylinderGeometry args={[1.4, 1.4, 90, 16, 1, true]} />
         <meshBasicMaterial color={hex} transparent opacity={0.55} depthWrite={false} fog={false} />
@@ -605,7 +666,7 @@ function Beacon({ point, color: hex, label }) {
           <lineSegments geometry={lead} raycast={noRaycast} renderOrder={9}>
             <lineBasicMaterial color={hex} transparent depthWrite={false} fog={false} />
           </lineSegments>
-          <mesh position={[click[0] - xy[0], click[1] - xy[1], 1.2]} raycast={noRaycast} renderOrder={9}>
+          <mesh position={[click[0] - xy[0], click[1] - xy[1], clickZ]} raycast={noRaycast} renderOrder={9}>
             <circleGeometry args={[2.2, 24]} />
             <meshBasicMaterial color={hex} transparent depthWrite={false} fog={false} />
           </mesh>
@@ -615,7 +676,7 @@ function Beacon({ point, color: hex, label }) {
   )
 }
 
-export default function City({ city, parks, size, origin, destination, route, walkCmd, onPick, onPhase, progressRef }) {
+export default function City({ city, terrain, parks, size, origin, destination, route, walkCmd, onPick, onPhase, progressRef }) {
   // Ignore clicks that end a drag (orbiting or panning).
   const pick = (e) => {
     e.stopPropagation()
@@ -641,17 +702,13 @@ export default function City({ city, parks, size, origin, destination, route, wa
       <OrbitControls makeDefault maxPolarAngle={Math.PI / 2.1} minDistance={50} maxDistance={6000} />
       <NightFade on={!!route} materials={materials} />
       <group rotation={TO_Y_UP}>
-        <mesh onClick={pick} renderOrder={0}>
-          <planeGeometry args={[w + 600, h + 600]} />
-          <meshBasicMaterial color={GROUND_COLOR} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} ref={(m) => { materials.ground = m }} />
-        </mesh>
-        {parks && <ParkGround parks={parks.parks} materials={materials} />}
-        <Streets edges={city.edges} materials={materials} />
-        {parks && <Trees positions={parks.positions} colors={parks.colors} materials={materials} />}
-        <Buildings buildings={city.buildings} materials={materials} highlights={highlights} onPick={pick} />
-        {route && <RouteShow key={route.id} city={city} route={route} walkCmd={walkCmd} onPhase={onPhase} progressRef={progressRef} />}
-        {origin && <Beacon key={`o${origin.node}`} point={origin} color={ROUTE_COLORS.origin} label="Origin" />}
-        {destination && <Beacon key={`d${destination.node}`} point={destination} color={ROUTE_COLORS.destination} label="Destination" />}
+        <Ground terrain={terrain} parks={parks.parks} materials={materials} onPick={pick} />
+        <Streets edges={city.edges} terrain={terrain} materials={materials} />
+        <Trees positions={parks.positions} colors={parks.colors} lifts={parks.lifts} materials={materials} />
+        <Buildings buildings={city.buildings} terrain={terrain} materials={materials} highlights={highlights} onPick={pick} />
+        {route && <RouteShow key={route.id} city={city} terrain={terrain} route={route} walkCmd={walkCmd} onPhase={onPhase} progressRef={progressRef} />}
+        {origin && <Beacon key={`o${origin.node}`} point={origin} terrain={terrain} color={ROUTE_COLORS.origin} label="Origin" />}
+        {destination && <Beacon key={`d${destination.node}`} point={destination} terrain={terrain} color={ROUTE_COLORS.destination} label="Destination" />}
       </group>
     </Canvas>
   )

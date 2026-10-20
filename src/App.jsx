@@ -3,13 +3,14 @@ import City, { WALK_M_PER_S, EYE_M } from './City.jsx'
 import { prepareCity, MAX_SNAP_M, SPEED_M_PER_MIN } from './reach.js'
 import { prepareRouting, snapToNode, findRoute } from './route.js'
 import { makeParks } from './trees.js'
+import { prepareTerrain } from './terrain.js'
 import { USES, ROUTE_COLORS } from './colors.js'
 
-const FILES = { kit: 'kit.json', buildings: 'buildings.geojson', graph: 'streets.graph.json', zensus: 'zensus.geojson', plots: 'plots.geojson' }
+const FILES = { kit: 'kit.json', buildings: 'buildings.geojson', graph: 'streets.graph.json', zensus: 'zensus.geojson', plots: 'plots.geojson', terrain: 'terrain.json' }
 
-// Worded as in public/data/SOURCES.md.
+// Worded as in public/data/SOURCES.md, plus the terrain, which is not part of the kit.
 const ATTRIBUTION =
-  'Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedestrian network: Egor Gaydukov, InfAU, Bauhaus-Universität Weimar. Census grid: Zensus 2022, © Statistische Ämter des Bundes und der Länder (dl-de/by-2-0).'
+  'Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedestrian network: Egor Gaydukov, InfAU, Bauhaus-Universität Weimar. Census grid: Zensus 2022, © Statistische Ämter des Bundes und der Länder (dl-de/by-2-0). Terrain: digital terrain model DGM1 © GDI-Th (dl-de/by-2-0).'
 
 // The steps shown in the banner, and which one each stage belongs to.
 const STEPS = ['Origin', 'Destination', 'A* search', 'Walkthrough']
@@ -57,7 +58,8 @@ export default function App() {
 
   const city = useMemo(() => data && prepareCity(data), [data])
   const links = useMemo(() => city && prepareRouting(city), [city])
-  const parks = useMemo(() => city && makeParks(city, data.plots), [city, data])
+  const terrain = useMemo(() => data && prepareTerrain(data.terrain), [data])
+  const parks = useMemo(() => city && makeParks(city, data.plots, terrain), [city, data, terrain])
 
   const reset = () => {
     setOrigin(null)
@@ -93,7 +95,7 @@ export default function App() {
   return (
     <div className={PICKING.has(phase) ? 'app picking' : 'app'}>
       {city ? (
-        <City city={city} parks={parks} size={data.kit.size_m} origin={origin} destination={destination} route={route}
+        <City city={city} terrain={terrain} parks={parks} size={data.kit.size_m} origin={origin} destination={destination} route={route}
           walkCmd={walkCmd} onPick={pick} onPhase={setPhase} progressRef={progressRef} />
       ) : (
         <p className="loading">{error ? `The city kit didn't load (${error}).` : 'Loading the city kit…'}</p>

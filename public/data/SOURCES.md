@@ -18,6 +18,8 @@ Put this line on every map or page that uses the kit:
 
 > Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedestrian network: Egor Gaydukov, InfAU, Bauhaus-Universität Weimar. Census grid: Zensus 2022, © Statistische Ämter des Bundes und der Länder (dl-de/by-2-0).
 
+A page that also uses `terrain.json` adds: "Terrain: digital terrain model DGM1 © GDI-Th (dl-de/by-2-0)."
+
 ## `buildings.geojson`
 
 Footprints and heights from the 3D building models in level of detail 2 (LoD2) of the Thüringer Landesamt für Bodenmanagement und Geoinformation, tiles 32_662_5648 and 32_662_5650, surveyed 14 October 2024. Licence: Datenlizenz Deutschland, Namensnennung, Version 2.0 (dl-de/by-2-0), © GDI-Th. Floors and floor area by use were added by Egor Gaydukov.
@@ -94,3 +96,21 @@ How to read it:
 ## `kit.json`
 
 The kit area: `label`, `center` as `[lon, lat]`, `bbox` as `[west, south, east, north]`, `size_m` as `[width, height]`, and `generated`.
+
+## `terrain.json`
+
+Not part of the generated kit: added on 2026-10-20 for the A* route walk, with `scripts/terrain.mjs` at the root of the repository.
+
+Source: Digitales Geländemodell 1 m (DGM1) of the Landesamt für Bodenmanagement und Geoinformation Thüringen, period 2020–2025, open geodata from https://geoportal.geoportal-th.de/hoehendaten/DGM/dgm_2020-2025/, the nine 1 × 1 km tiles `dgm1_32_<east>_<north>_1_th_2020-2025` for east 662–664 and north 5649–5651. Airborne laser scanning, February 2020; height accuracy 0.15–0.30 m; positions in ETRS89 / UTM zone 32N (EPSG:25832), heights above sea level in DHHN2016 (EPSG:7837). © GDI-Th, Freistaat Thüringen. Licence: Datenlizenz Deutschland, Namensnennung, Version 2.0 (dl-de/by-2-0).
+
+The ground surface without buildings or trees, averaged onto a 5 m grid in the kit's own metres. The grid covers the kit area plus 300 m on each side.
+
+| Field | Meaning | Unit |
+| --- | --- | --- |
+| `origin` | the south-west grid point, `[x, y]`: east and north of the kit `center`, in the same flat projection as the app | metres |
+| `step_m` | distance between grid points | metres |
+| `cols`, `rows` | grid points from west to east, and from south to north | |
+| `base_m` | the height that the values count from | metres above sea level |
+| `heights_dm` | one value per grid point, row by row from the south-west, west to east; each is the average of the 5 × 5 one-metre cells around the point | decimetres above `base_m` |
+
+377 × 519 points, from 204.7 to 277.4 m above sea level.

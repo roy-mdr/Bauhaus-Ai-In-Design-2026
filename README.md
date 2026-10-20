@@ -5,6 +5,7 @@ A 3D map of central Weimar. Pick an origin and a destination, watch the A* searc
 ## What it does
 
 - Shows every building of the city kit in 3D, extruded from its footprint to its measured height, coloured by its main use (legend at the top right), with the pedestrian network drawn as thin lines.
+- The ground follows the real topography, from the Ilm valley in the east (about 205 m above sea level) up to the west. Buildings, streets, trees, the search and the route all sit on it, and the walkthrough rises and falls with the slopes.
 - Parks are drawn on green ground and filled with trees made of point clouds, a trunk and a leafy crown each, so you can tell a park from above and when you pass through one in the walkthrough.
 - A banner at the top of the map shows the four steps (origin, destination, A* search, walkthrough), marks the current one, and says what to do next.
 - Click on the map to set the origin, then click again to set the destination. Each gets a large glowing sphere on a pillar with its name above it (green for the origin, yellow for the destination), and the buildings around the click light up in the same colour, closest first. If the nearest street corner is away from the click, a small dot and a line join the two; the panel says how far it is.
@@ -31,12 +32,14 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 - **A\*:** from the origin, the search keeps a frontier of nodes it could look at next. It always takes the one with the smallest "distance walked so far + straight-line distance still to the destination", so it reaches towards the destination instead of spreading in all directions. The straight line is never longer than the real walk, so the route found is the shortest along the network.
 - **Comparison:** the app also runs Dijkstra's search, which ignores the straight-line distance, and shows how many nodes it would have looked at for the same route.
 - **Walking time:** route length at 4.8 km/h, that is 80 m per minute.
-- **Walkthrough:** a smooth camera glide, no walking motion, at 40 m per second, about thirty times walking pace, with the eye 1.7 m above the ground. Corners are rounded off slightly, and the camera turns smoothly towards a point 30 m ahead.
+- **Terrain:** heights from the official digital terrain model of Thuringia (DGM1, laser scanned 2020, 1 m grid), averaged to a 5 m grid. Each building stands on the average ground under its footprint, with its walls reaching a metre below the lowest point so it never floats on a slope.
+- **Walkthrough:** a smooth camera glide, no walking motion, at 40 m per second, about thirty times walking pace, with the eye 1.7 m above the ground at every point, so the camera climbs and descends with the terrain. Corners are rounded off slightly, and the camera turns smoothly towards a point 30 m ahead.
 
 ## Limits
 
 - The route starts and ends at street nodes, not at the exact click points; the few metres from a click to its node are not counted.
-- The walk is on flat ground at a steady speed: no waiting at crossings, no slopes, no stairs.
+- Route lengths and walking times are measured on the map, as in the network: slopes don't make a route longer or slower, and A* doesn't avoid hills. There is no waiting at crossings and no stairs.
+- The terrain is averaged over 5 m, so kerbs, steps, walls and small embankments are smoothed away; bridges and underpasses don't exist in it (the ground model runs under bridges).
 - The network is a drawing for a walking simulation. Paths it does not contain, such as through courtyards or private ground, are not used.
 - Buildings in the walkthrough are simple blocks with flat roofs at their highest point; roofs, façades and trees are not modelled.
 - The kit covers only part of Weimar. Routes can only use the network inside it.
@@ -53,8 +56,9 @@ All data is in `public/data/`; see `public/data/SOURCES.md`.
 | Pedestrian network | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar | |
 | Land use per plot (parks) | Egor Gaydukov, InfAU, Bauhaus-Universität Weimar | |
 | Census grid | Zensus 2022, 100 m grid, © Statistische Ämter des Bundes und der Länder | dl-de/by-2-0 |
+| Terrain (`terrain.json`, not part of the kit) | Digital terrain model DGM1 of Thuringia, airborne laser scan 2020, © GDI-Th; averaged to a 5 m grid by `scripts/terrain.mjs` | dl-de/by-2-0 |
 
-Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedestrian network: Egor Gaydukov, InfAU, Bauhaus-Universität Weimar. Census grid: Zensus 2022, © Statistische Ämter des Bundes und der Länder (dl-de/by-2-0).
+Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedestrian network: Egor Gaydukov, InfAU, Bauhaus-Universität Weimar. Census grid: Zensus 2022, © Statistische Ämter des Bundes und der Länder (dl-de/by-2-0). Terrain: digital terrain model DGM1 © GDI-Th (dl-de/by-2-0).
 
 ## How this was made
 

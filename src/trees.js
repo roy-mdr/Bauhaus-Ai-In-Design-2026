@@ -34,7 +34,7 @@ const openRing = (ring) => {
 }
 
 // The park outlines in metres, and a point cloud of trees inside them.
-export function makeParks(city, plots) {
+export function makeParks(city, plots, terrain) {
   const rand = random(1919) // the year the Bauhaus was founded in Weimar
   const parks = plots.features
     .filter((f) => f.properties.landuse === PARK_LANDUSE)
@@ -74,15 +74,17 @@ export function makeParks(city, plots) {
   }
 
   // Each tree: a trunk of points, and a crown of points, denser towards its surface and lighter on top.
-  const positions = [], colors = []
+  const positions = [], colors = [], lifts = [] // lifts: height of each point above its tree's foot, for the wind
   for (const [x, y] of trees) {
+    const ground = terrain.heightAt(x, y)
     const height = 8 + rand() * 10
     const radius = 2.5 + rand() * 2.5
     const crownZ = height - radius
     const hue = 0.24 + rand() * 0.12, sat = 0.4 + rand() * 0.2, light = 0.3 + rand() * 0.12
 
     for (let z = 0; z < crownZ; z += 0.35) {
-      positions.push(x + (rand() - 0.5) * 0.3, y + (rand() - 0.5) * 0.3, z)
+      positions.push(x + (rand() - 0.5) * 0.3, y + (rand() - 0.5) * 0.3, ground + z)
+      lifts.push(z)
       colors.push(...hsl(0.08, 0.35, 0.22 + rand() * 0.08))
     }
     const count = Math.round(40 + radius * 30)
@@ -91,10 +93,11 @@ export function makeParks(city, plots) {
       const u = rand() * 2 - 1, a = rand() * Math.PI * 2, r = radius * rand() ** 0.35
       const s = Math.sqrt(1 - u * u)
       const dz = u * r * 0.85
-      positions.push(x + s * Math.cos(a) * r, y + s * Math.sin(a) * r, crownZ + dz)
+      positions.push(x + s * Math.cos(a) * r, y + s * Math.sin(a) * r, ground + crownZ + dz)
+      lifts.push(crownZ + dz)
       colors.push(...hsl(hue + (rand() - 0.5) * 0.04, sat, light + (dz / radius) * 0.1 + (rand() - 0.5) * 0.08))
     }
   }
 
-  return { parks, treeCount: trees.length, positions: new Float32Array(positions), colors: new Float32Array(colors) }
+  return { parks, treeCount: trees.length, positions: new Float32Array(positions), colors: new Float32Array(colors), lifts: new Float32Array(lifts) }
 }
