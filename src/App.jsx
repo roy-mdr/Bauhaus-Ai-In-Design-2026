@@ -4,12 +4,13 @@ import { prepareCity, computeReach, MINUTES, SPEED_M_PER_MIN, BAND_M, MAX_SNAP_M
 import { computeGrowth, RADII, GRADIENTS, STOREY_M } from './growth.js'
 import { sunPosition, newShadow, DAYS, MIN_SUN_ALTITUDE } from './shadows.js'
 import { windBase, windSpeed, windChange, WIND_DIRS } from './wind.js'
+import { makeTerrain, EXAGGERATIONS } from './terrain.js'
 import {
   USES, REACH_COLORS, GROWTH_COLOR, NEW_SHADOW_COLOR, WIND_CALM, WIND_NORMAL, WIND_STRONG, WINDIER_COLOR, CALMER_COLOR,
   labelForUse,
 } from './colors.js'
 
-const FILES = { kit: 'kit.json', buildings: 'buildings.geojson', graph: 'streets.graph.json', zensus: 'zensus.geojson' }
+const FILES = { kit: 'kit.json', buildings: 'buildings.geojson', graph: 'streets.graph.json', zensus: 'zensus.geojson', plots: 'plots.geojson' }
 
 // Worded as in public/data/SOURCES.md.
 const ATTRIBUTION =
@@ -37,6 +38,7 @@ export default function App() {
   const [hour, setHour] = useState(15)
   const [windOn, setWindOn] = useState(true)
   const [windFrom, setWindFrom] = useState('W') // westerly winds are the most common in Thuringia
+  const [exaggeration, setExaggeration] = useState(1) // 0 flat, 1 true scale, 3 three times higher
 
   useEffect(() => {
     Promise.all(
@@ -52,6 +54,7 @@ export default function App() {
   }, [])
 
   const city = useMemo(() => data && prepareCity(data), [data])
+  const terrain = useMemo(() => city && makeTerrain(data.plots, city.project, data.kit.size_m), [city, data])
   const growth = useMemo(
     () => city && growthCentre && computeGrowth(city, growthCentre, { radius, storeys, gradient }),
     [city, growthCentre, radius, storeys, gradient],
@@ -86,7 +89,7 @@ export default function App() {
   return (
     <div className="app">
       {city ? (
-        <City city={city} size={data.kit.size_m} marked={mode === 'reach' ? marked : null}
+        <City city={city} size={data.kit.size_m} terrain={terrain} exaggeration={exaggeration} marked={mode === 'reach' ? marked : null}
           reach={mode === 'reach' ? reach : null}
           growth={growthMode ? growth : null}
           sun={growthMode && shadowsOn && sunUp ? sun : null}
@@ -129,6 +132,12 @@ export default function App() {
             <button className="clear" disabled={!growthCentre} onClick={() => setGrowthCentre(null)}>Reset</button>
           </div>
         )}
+        <label className="terrain-select">
+          Terrain (simulated)
+          <select value={exaggeration} onChange={(e) => setExaggeration(Number(e.target.value))}>
+            {EXAGGERATIONS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+          </select>
+        </label>
       </nav>
 
       {mode === 'growth' ? (
@@ -231,6 +240,9 @@ export default function App() {
               much taller than its neighbours speeds up the wind at its corners. Use it to see where to look closer,
               not to judge comfort or safety.
             </p>
+            <p>
+              New shadow and wind are worked out on flat ground: they ignore the simulated terrain.
+            </p>
           </div>
         </aside>
       ) : (
@@ -330,6 +342,12 @@ export default function App() {
             </li>
           ))}
         </ul>
+        {terrain && (
+          <p className="note terrain-note">
+            Ground heights are simulated, not measured: the kit has none. Lowest along the river plots
+            ({Math.round(terrain.min)} m above sea level), rising to {Math.round(terrain.max)} m away from them.
+          </p>
+        )}
       </aside>
 
       <footer className="attribution">{ATTRIBUTION}</footer>

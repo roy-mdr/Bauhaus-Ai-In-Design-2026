@@ -30,6 +30,9 @@ export const labelForUse = (use) => labels[use] ?? labels.undefined
 export const REACH_COLORS = ['#b8431c', '#e2804f', '#f4bf9f']
 
 export const GROUND_COLOR = '#efede6'
+// The simulated terrain, from the river (low) to the highest ground.
+export const GROUND_LOW_COLOR = '#e1e6db'
+export const GROUND_HIGH_COLOR = '#f3ede0'
 export const STREET_COLOR = '#8e8b83'
 
 // City growth: buildings that gain storeys are tinted towards this colour, the more the stronger.
