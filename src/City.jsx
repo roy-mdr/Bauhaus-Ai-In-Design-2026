@@ -23,8 +23,44 @@ export const WALK_M_PER_S = 40 // about thirty times walking pace
 const LOOK_AHEAD_M = 30 // the camera turns towards the route this far ahead
 const ROUND_M = 6 // corners are rounded off by averaging the route this far behind and ahead
 export const EYE_M = 1.7
-const OVERVIEW_FOV = 40
-const WALK_FOV = 75
+
+// Lenses. The overview is a near-parallel, isometric view: a 1° lens from far away, so lines that are
+// parallel in the city stay (almost) parallel on screen, looking from the south-west at the classic
+// isometric angle, 35° down. The walkthrough uses a 15 mm lens on a full-frame camera (36 × 24 mm film),
+// about 100° across, with the 36 mm side along the window's longer side.
+const OVERVIEW_FOV = 1
+const FOCAL_MM = 15
+const FILM_MM = 36
+const ISO_DIR = new THREE.Vector3(-1, 1, 1).normalize() // from the point looked at towards the camera
+const walkFov = (aspect) => (360 / Math.PI) * Math.atan(FILM_MM / Math.max(aspect, 1) / 2 / FOCAL_MM)
+// How far away the overview camera stands to show `size` metres from the top to the bottom of the window.
+const overviewDistance = (size) => size / 2 / Math.tan((OVERVIEW_FOV * Math.PI) / 360)
+
+// The camera only draws what lies between its near and far planes; keep them around what it looks at.
+function setLens(camera, fov, distance) {
+  camera.fov = fov
+  camera.near = Math.max(0.1, distance - 4000)
+  camera.far = distance + 5000
+  camera.updateProjectionMatrix()
+}
+
+// A view of the camera: the point it looks at, the direction from there back to the camera, how far
+// away it stands, and its lens. Blending two views is a "dolly zoom": the lens widens or narrows as the
+// camera moves, so the view changes smoothly from the isometric overview to the street, and back.
+const viewOf = (camera, look) => ({ look: look.clone(), dir: camera.position.clone().sub(look).normalize(), dist: camera.position.distanceTo(look), fov: camera.fov })
+
+function blendViews(a, b, k, camera) {
+  const [ta, tb] = [Math.tan((a.fov * Math.PI) / 360), Math.tan((b.fov * Math.PI) / 360)]
+  const mix = (p, q) => Math.exp(Math.log(p) + (Math.log(q) - Math.log(p)) * k) // halfway in ratio, not in metres
+  const tanHalf = mix(ta, tb)
+  const dist = mix(a.dist * ta, b.dist * tb) / tanHalf // the width of the view changes evenly, too
+  const look = new THREE.Vector3().lerpVectors(a.look, b.look, Math.min(1, k * 1.3))
+  const dir = new THREE.Vector3().lerpVectors(a.dir, b.dir, k).normalize()
+  camera.position.copy(look).addScaledVector(dir, dist)
+  camera.lookAt(look)
+  setLens(camera, (360 / Math.PI) * Math.atan(tanHalf), dist)
+  return { look, dist }
+}
 
 // All buildings in one mesh: walls and flat roofs from footprint and height.
 // `ranges` remembers which vertices belong to which building, so we can light them up.
@@ -241,6 +277,16 @@ function Trees({ positions, colors, lifts, materials }) {
   return <points geometry={geometry} material={material} raycast={noRaycast} />
 }
 
+// While you orbit and zoom the overview, keep the near and far planes around the point looked at.
+function OverviewLens() {
+  useFrame(({ camera, controls }) => {
+    if (!controls?.enabled) return
+    const d = camera.position.distanceTo(controls.target)
+    if (Math.abs(camera.far - (d + 5000)) > 1) setLens(camera, camera.fov, d)
+  })
+  return null
+}
+
 // Fades the city between day and night: night while a route is shown, so the search glows.
 function NightFade({ on, materials }) {
   const night = useRef(0)
@@ -441,13 +487,12 @@ function RouteShow({ city, terrain, route, walkCmd, onPhase, progressRef }) {
     materials.guide = glow(RIBBON_VERTEX, PATH_FRAGMENT, pathUniforms(0.95))
     materials.guide.uniforms.uDraw.value = 1
 
-    // Where the camera looks from after the walk: the whole route in view, seen from the south.
+    // The isometric view of the whole route, during the search and after the walk.
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const [x, y] of route.points) [minX, minY, maxX, maxY] = [Math.min(minX, x), Math.min(minY, y), Math.max(maxX, x), Math.max(maxY, y)]
     const [cx, cy] = [(minX + maxX) / 2, (minY + maxY) / 2]
-    const distance = Math.max(300, Math.max(maxX - minX, maxY - minY) * 1.4)
-    const ground = terrain.heightAt(cx, cy)
-    const overview = { position: toWorld([cx, cy - distance * 0.8], ground + distance), target: toWorld([cx, cy], ground) }
+    const target = toWorld([cx, cy], terrain.heightAt(cx, cy))
+    const overview = { look: target, dir: ISO_DIR.clone(), dist: overviewDistance(Math.max(250, Math.max(maxX - minX, maxY - minY) * 1.3)), fov: OVERVIEW_FOV }
 
     return { rate, searchEnd, explored, path, halo, guide, nodes, materials, overview }
   }, [city, terrain, route])
@@ -465,31 +510,36 @@ function RouteShow({ city, terrain, route, walkCmd, onPhase, progressRef }) {
   const pathMesh = useRef()
   const guideMesh = useRef()
 
-  const setLens = (fov, near, far) => {
-    camera.fov = fov
-    camera.near = near
-    camera.far = far
-    camera.updateProjectionMatrix()
+  // The camera at the start of the walk: at eye height on the origin, looking along the route.
+  const streetView = (aspect) => {
+    const eye = onGround(glidePoint(route, 0), EYE_M)
+    const look = onGround(pointAlong(route, LOOK_AHEAD_M), EYE_M)
+    return { look, dir: eye.clone().sub(look).normalize(), dist: eye.distanceTo(look), fov: walkFov(aspect) }
   }
 
   const startWalk = () => {
     const c = clock.current
     c.t = Math.max(c.t, show.searchEnd + PATH_S) // a walk started early skips the rest of the search
     c.walked = true
-    c.walk = { stage: 'in', t: 0, d: 0, fromPos: camera.position.clone(), fromLook: controls ? controls.target.clone() : toWorld([0, 0]), dir: new THREE.Vector3() }
+    c.walk = { stage: 'in', t: 0, d: 0, from: viewOf(camera, controls ? controls.target : toWorld([0, 0])), dir: new THREE.Vector3() }
     if (controls) controls.enabled = false
-    setLens(camera.fov, 0.1, 4000)
     scene.fog = new THREE.Fog(NIGHT.background, 80, 700)
     onPhase('walking')
+  }
+
+  // Fog in the street, thinning out as the camera rises, so the overview stays clear.
+  const setFog = (dist) => {
+    const k = Math.max(1, dist / LOOK_AHEAD_M)
+    scene.fog.near = 80 * k
+    scene.fog.far = 700 * k
   }
 
   const endWalk = () => {
     const c = clock.current
     c.walk = null
-    setLens(OVERVIEW_FOV, 2, 20000)
     scene.fog = null
     if (controls) {
-      controls.target.copy(show.overview.target)
+      controls.target.copy(show.overview.look)
       controls.enabled = true
       controls.update()
     }
@@ -502,17 +552,21 @@ function RouteShow({ city, terrain, route, walkCmd, onPhase, progressRef }) {
     const c = clock.current
     if (walkCmd?.kind === 'start' && !c.walk) startWalk()
     if (walkCmd?.kind === 'skip' && c.walk && c.walk.stage !== 'out') {
-      Object.assign(c.walk, { stage: 'out', t: 0, fromPos: camera.position.clone(), fromLook: camera.position.clone().add(c.walk.dir.clone().multiplyScalar(10)) })
+      const look = camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(LOOK_AHEAD_M).add(camera.position)
+      Object.assign(c.walk, { stage: 'out', t: 0, from: viewOf(camera, look) })
     }
   }, [walkCmd]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // If the route goes away mid-walk, hand the camera back.
+  // If the route goes away mid-walk, hand the camera back, in the overview.
   useEffect(
     () => () => {
       if (!clock.current.walk) return
-      setLens(OVERVIEW_FOV, 2, 20000)
       scene.fog = null
-      if (controls) controls.enabled = true
+      blendViews(show.overview, show.overview, 1, camera)
+      if (controls) {
+        controls.target.copy(show.overview.look)
+        controls.enabled = true
+      }
     },
     [], // eslint-disable-line react-hooks/exhaustive-deps
   )
@@ -540,12 +594,11 @@ function RouteShow({ city, terrain, route, walkCmd, onPhase, progressRef }) {
     if (pathMesh.current) pathMesh.current.visible = c.t > searchEnd && !low
     if (guideMesh.current) guideMesh.current.visible = c.t > searchEnd && low
 
-    // While the search runs, glide the camera to see origin and destination together.
+    // While the search runs, glide the camera to see origin and destination together, isometric.
     if (!c.walked && controls && c.t < GLIDE_S + dt) {
-      c.glide ??= { position: camera.position.clone(), target: controls.target.clone() }
-      const k = ease(clamp01(c.t / GLIDE_S))
-      camera.position.lerpVectors(c.glide.position, show.overview.position, k)
-      controls.target.lerpVectors(c.glide.target, show.overview.target, k)
+      c.glide ??= viewOf(camera, controls.target)
+      const { look } = blendViews(c.glide, show.overview, ease(clamp01(c.t / GLIDE_S)), camera)
+      controls.target.copy(look)
     }
     if (!c.found && c.t > searchEnd) {
       c.found = true
@@ -559,15 +612,11 @@ function RouteShow({ city, terrain, route, walkCmd, onPhase, progressRef }) {
     w.t += dt
 
     if (w.stage === 'in') {
-      // Fly down from where the camera is to eye height at the origin.
-      const k = ease(clamp01(w.t / FLY_S))
-      const eye = onGround(glidePoint(route, 0), EYE_M)
-      const target = onGround(pointAlong(route, LOOK_AHEAD_M), EYE_M)
-      camera.position.lerpVectors(w.fromPos, eye, k)
-      look.lerpVectors(w.fromLook, target, k)
-      camera.lookAt(look)
-      setLens(OVERVIEW_FOV + (WALK_FOV - OVERVIEW_FOV) * k, 0.1, 4000)
-      if (w.t >= FLY_S) Object.assign(w, { stage: 'walk', t: 0, dir: target.sub(eye).normalize() })
+      // Swoop down from the isometric view to eye height at the origin, while the lens widens to 15 mm.
+      const street = streetView(camera.aspect)
+      const { dist } = blendViews(w.from, street, ease(clamp01(w.t / FLY_S)), camera)
+      setFog(dist)
+      if (w.t >= FLY_S) Object.assign(w, { stage: 'walk', t: 0, dir: street.dir.clone().negate() })
     } else if (w.stage === 'walk') {
       // Glide along the route at eye height above the ground, so up and down the slopes, with rounded
       // corners; the gaze turns smoothly towards a point further ahead, also at eye height.
@@ -577,15 +626,17 @@ function RouteShow({ city, terrain, route, walkCmd, onPhase, progressRef }) {
       if (ahead.length() > 0.5) w.dir.lerp(ahead.normalize(), 1 - Math.exp(-3 * dt)).normalize()
       camera.position.copy(eye)
       camera.lookAt(look.copy(eye).add(w.dir))
+      setLens(camera, walkFov(camera.aspect), LOOK_AHEAD_M)
+      setFog(LOOK_AHEAD_M)
       if (progressRef.current) progressRef.current.textContent = `${Math.round(w.d).toLocaleString('en-GB')} of ${Math.round(length).toLocaleString('en-GB')} m`
-      if (w.d >= length) Object.assign(w, { stage: 'out', t: 0, fromPos: eye.clone(), fromLook: eye.clone().add(w.dir.clone().multiplyScalar(10)) })
+      if (w.d >= length) {
+        const front = eye.clone().addScaledVector(w.dir, LOOK_AHEAD_M)
+        Object.assign(w, { stage: 'out', t: 0, from: viewOf(camera, front) })
+      }
     } else {
-      // Rise back up to see the whole route.
-      const k = ease(clamp01(w.t / FLY_S))
-      camera.position.lerpVectors(w.fromPos, show.overview.position, k)
-      look.lerpVectors(w.fromLook, show.overview.target, k)
-      camera.lookAt(look)
-      setLens(WALK_FOV + (OVERVIEW_FOV - WALK_FOV) * k, 0.1, 4000)
+      // Rise back up to the isometric view of the whole route, while the lens narrows again.
+      const { dist } = blendViews(w.from, show.overview, ease(clamp01(w.t / FLY_S)), camera)
+      setFog(dist)
       if (w.t >= FLY_S) endWalk()
     }
   })
@@ -625,11 +676,13 @@ function Beacon({ point, terrain, color: hex, label }) {
     const k = (clock.elapsedTime * 0.8) % 1
     ring.current.scale.setScalar(1 + k * 6)
     ring.current.material.opacity = 0.8 * (1 - k)
-    // Pop in with a small overshoot, then float gently. Seen from far away the sphere grows,
-    // so it never shrinks to a dot.
+    // Pop in with a small overshoot, then float gently. When the view shows a large area the sphere
+    // grows, so it never shrinks to a dot. (The size of the view counts, not the distance: the
+    // isometric camera stands very far away.)
     const t = Math.min(1, age / 0.6)
     const pop = 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2
-    const far = Math.max(1, camera.position.distanceTo(ball.current.getWorldPosition(seen)) / 500)
+    const viewSize = camera.position.distanceTo(ball.current.getWorldPosition(seen)) * Math.tan((camera.fov * Math.PI) / 360)
+    const far = Math.max(1, viewSize / 180)
     ball.current.scale.setScalar(Math.max(0.001, pop * far))
     ball.current.position.z = 16 * far + Math.sin(age * 2) * 1.5
   })
@@ -683,8 +736,7 @@ export default function City({ city, terrain, parks, size, origin, destination, 
     if (e.delta > 5) return
     onPick([e.point.x, -e.point.z])
   }
-  const [w, h] = size
-  const distance = Math.max(w, h) * 0.9
+  const start = ISO_DIR.clone().multiplyScalar(overviewDistance(Math.max(...size) * 1.15)) // the whole kit in view
   const materials = useRef({}).current
   const highlights = useMemo(
     () => [
@@ -695,11 +747,13 @@ export default function City({ city, terrain, parks, size, origin, destination, 
   )
 
   return (
-    <Canvas flat camera={{ position: [0, distance, distance * 0.9], fov: OVERVIEW_FOV, near: 2, far: 20000 }} dpr={[1, 2]}>
+    <Canvas flat camera={{ position: start.toArray(), fov: OVERVIEW_FOV, near: start.length() - 4000, far: start.length() + 5000 }} dpr={[1, 2]}>
       <color attach="background" args={[BACKGROUND_COLOR]} />
       <ambientLight intensity={1.6} />
       <directionalLight position={[-600, 1200, 800]} intensity={1.8} />
-      <OrbitControls makeDefault maxPolarAngle={Math.PI / 2.1} minDistance={50} maxDistance={6000} />
+      {/* zoom limits: from about 40 m to 5 km from the top to the bottom of the window */}
+      <OrbitControls makeDefault maxPolarAngle={Math.PI / 2.1} minDistance={overviewDistance(40)} maxDistance={overviewDistance(5000)} />
+      <OverviewLens />
       <NightFade on={!!route} materials={materials} />
       <group rotation={TO_Y_UP}>
         <Ground terrain={terrain} parks={parks.parks} materials={materials} onPick={pick} />

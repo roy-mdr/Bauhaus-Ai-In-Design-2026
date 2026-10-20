@@ -33,6 +33,7 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 - **Comparison:** the app also runs Dijkstra's search, which ignores the straight-line distance, and shows how many nodes it would have looked at for the same route.
 - **Walking time:** route length at 4.8 km/h, that is 80 m per minute.
 - **Terrain:** heights from the official digital terrain model of Thuringia (DGM1, laser scanned 2020, 1 m grid), averaged to a 5 m grid. Each building stands on the average ground under its footprint, with its walls reaching a metre below the lowest point so it never floats on a slope.
+- **Views:** the map is shown isometric, from the south-west and 35° down, in near-parallel projection: a 1° lens from far away, so parallel lines stay parallel to within about 1 %. The walkthrough uses a 15 mm lens on a full-frame camera, about 100° across. Between the two, the camera swoops down and the lens widens at the same time (a dolly zoom), and the reverse on the way back up.
 - **Walkthrough:** a smooth camera glide, no walking motion, at 40 m per second, about thirty times walking pace, with the eye 1.7 m above the ground at every point, so the camera climbs and descends with the terrain. Corners are rounded off slightly, and the camera turns smoothly towards a point 30 m ahead.
 
 ## Limits

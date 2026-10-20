@@ -187,7 +187,8 @@ export default function App() {
           <p>
             Origin and destination are the network nodes nearest to your clicks; if no walkable street is within{' '}
             {MAX_SNAP_M} m, nothing is set. The walking time is at 4.8 km/h. The walkthrough moves at {WALK_M_PER_S} m
-            per second, about {Math.round(WALK_M_PER_S / (SPEED_M_PER_MIN / 60))} times walking pace, with the eye {EYE_M} m above the ground.
+            per second, about {Math.round(WALK_M_PER_S / (SPEED_M_PER_MIN / 60))} times walking pace, with the eye {EYE_M} m above the ground, through a 15 mm wide-angle lens. The map
+            itself is shown isometric, in near-parallel projection.
           </p>
           <p>
             Parks are the plots with the land use "recreation", drawn in green. The kit has no tree data: the{' '}
