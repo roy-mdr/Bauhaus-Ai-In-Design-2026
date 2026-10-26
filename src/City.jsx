@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { colorForUse, GROUND_COLOR, STREET_COLOR, PARK_COLOR, BACKGROUND_COLOR, NIGHT, ROUTE_COLORS } from './colors.js'
 import { drape } from './terrain.js'
 import { insideRing } from './reach.js'
+import { makeTreeModels, SPECIES_NAMES } from './treeModels.js'
 
 // The scene is built in metres with x to the east, y to the north and z up.
 // One rotation of the whole group turns it into three.js's "y is up".
@@ -245,36 +246,88 @@ function Ground({ terrain, parks, materials, onPick }) {
   )
 }
 
-// The trees as one point cloud. Each point is a round dot about half a metre wide, never smaller
-// than a pixel and a half, so the parks still read from far away, and never larger than 14 pixels,
-// so crowns close to the camera stay leafy instead of turning into large discs. The crowns sway a little in the wind.
-function Trees({ positions, colors, lifts, materials }) {
-  const geometry = useMemo(() => {
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    g.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-    g.setAttribute('aLift', new THREE.BufferAttribute(lifts, 1))
-    g.computeBoundingSphere()
-    return g
-  }, [positions, colors, lifts])
-  const material = useMemo(() => {
-    const m = new THREE.PointsMaterial({ size: 0.55, sizeAttenuation: true, vertexColors: true })
-    m.userData.time = { value: 0 }
-    m.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime = m.userData.time
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nattribute float aLift;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.xy += sin(uTime * 1.3 + position.x * 0.2 + position.y * 0.15) * 0.02 * aLift;')
-        .replace('#include <logdepthbuf_vertex>', 'gl_PointSize = clamp(gl_PointSize, 1.5, 14.0);\n#include <logdepthbuf_vertex>')
-      shader.fragmentShader = shader.fragmentShader.replace('void main() {', 'void main() {\n  if (length(gl_PointCoord - 0.5) > 0.5) discard;')
+// Tree materials. The crowns sway a little in the wind: the higher a point above the tree's foot,
+// the more it moves, each tree in its own rhythm. Leaf cards are seen from both sides; both sides
+// are lit the same way, as part of the crown, or half of them would turn dark at random.
+function treeMaterial(name, options, time, leaves) {
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true, ...options })
+  material.customProgramCacheKey = () => name
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = time
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime;')
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        vec2 seed = vec2(0.0);
+        #ifdef USE_INSTANCING
+          seed = instanceMatrix[3].xy;
+        #endif
+        float sway = max(position.z - 2.0, 0.0) * 0.012;
+        transformed.xy += vec2(sin(uTime * 1.3 + seed.x * 0.21 + seed.y * 0.13), cos(uTime * 1.1 + seed.x * 0.17)) * sway;`,
+      )
+    if (leaves)
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <normal_fragment_begin>',
+        THREE.ShaderChunk.normal_fragment_begin.replaceAll('normal *= faceDirection;', ''),
+      )
+  }
+  return material
+}
+
+// SPECIES_TINT: the colour each species' leaves are multiplied with, so they differ a little.
+const SPECIES_TINT = { lime: '#eefcd8', oak: '#cfe0b8', poplar: '#f4fcc8', spruce: '#c4d8cc' }
+
+// The trees: for every species one batch of copies of its model for the wood and one for the leaves,
+// each copy placed, turned, scaled and tinted; and a soft shadow on the ground under every crown.
+function Trees({ trees, materials }) {
+  const time = useMemo(() => ({ value: 0 }), [])
+  const objects = useMemo(() => {
+    const { models, leafImage, shadowImage } = makeTreeModels()
+    const wood = treeMaterial('tree-wood', {}, time, false)
+    const leaves = treeMaterial('tree-leaves', { map: leafImage, alphaTest: 0.45, side: THREE.DoubleSide }, time, true)
+    const shade = new THREE.MeshBasicMaterial({ map: shadowImage, transparent: true, depthWrite: false })
+    materials.trees = leaves
+    materials.wood = wood
+
+    const matrix = new THREE.Matrix4(), turn = new THREE.Quaternion(), tint = new THREE.Color()
+    const out = []
+    for (const name of SPECIES_NAMES) {
+      const mine = trees.filter((t) => t.species === name)
+      if (!mine.length) continue
+      const model = models[name]
+      const woodMesh = new THREE.InstancedMesh(model.wood, wood, mine.length)
+      const leafMesh = new THREE.InstancedMesh(model.leaves, leaves, mine.length)
+      mine.forEach((t, i) => {
+        turn.setFromAxisAngle(new THREE.Vector3(0, 0, 1), t.turn)
+        matrix.compose(new THREE.Vector3(t.x, t.y, t.z), turn, new THREE.Vector3(t.scale, t.scale, t.scale))
+        woodMesh.setMatrixAt(i, matrix)
+        leafMesh.setMatrixAt(i, matrix)
+        leafMesh.setColorAt(i, tint.set(SPECIES_TINT[name]).offsetHSL(t.hue * 0.04, 0, 0).multiplyScalar(t.shade))
+      })
+      out.push(woodMesh, leafMesh)
     }
-    return m
-  }, [])
-  materials.trees = material
+
+    const shadows = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 24), shade, trees.length)
+    trees.forEach((t, i) => {
+      const r = models[t.species].radius * t.scale * 1.1
+      shadows.setMatrixAt(i, matrix.compose(new THREE.Vector3(t.x, t.y, t.z + 0.3), new THREE.Quaternion(), new THREE.Vector3(r, r, 1)))
+    })
+    shadows.renderOrder = 2
+    out.push(shadows)
+
+    for (const o of out) {
+      o.raycast = noRaycast // clicks go through the trees to the ground
+      o.frustumCulled = false
+    }
+    return out
+  }, [trees, materials, time])
+
+  useEffect(() => () => objects.forEach((o) => o.dispose()), [objects])
   useFrame(({ clock }) => {
-    material.userData.time.value = clock.elapsedTime
+    time.value = clock.elapsedTime
   })
-  return <points geometry={geometry} material={material} raycast={noRaycast} />
+  return objects.map((o) => <primitive key={o.uuid} object={o} />)
 }
 
 // While you orbit and zoom the overview, keep the near and far planes around the point looked at.
@@ -290,7 +343,7 @@ function OverviewLens() {
 // Fades the city between day and night: night while a route is shown, so the search glows.
 function NightFade({ on, materials }) {
   const night = useRef(0)
-  const day = useMemo(() => ({ background: new THREE.Color(BACKGROUND_COLOR), terrain: new THREE.Color('#ffffff'), street: new THREE.Color(STREET_COLOR), buildings: new THREE.Color('#ffffff'), trees: new THREE.Color('#ffffff') }), [])
+  const day = useMemo(() => ({ background: new THREE.Color(BACKGROUND_COLOR), terrain: new THREE.Color('#ffffff'), street: new THREE.Color(STREET_COLOR), buildings: new THREE.Color('#ffffff'), trees: new THREE.Color('#ffffff'), wood: new THREE.Color('#ffffff') }), [])
   const dark = useMemo(() => Object.fromEntries(Object.entries(NIGHT).map(([k, c]) => [k, new THREE.Color(c)])), [])
   useFrame(({ scene }, dt) => {
     const before = night.current
@@ -298,7 +351,7 @@ function NightFade({ on, materials }) {
     if (Math.abs(before - night.current) < 1e-4) return
     const k = night.current
     scene.background?.lerpColors(day.background, dark.background, k)
-    for (const key of ['terrain', 'street', 'buildings', 'trees']) materials[key]?.color.lerpColors(day[key], dark[key], k)
+    for (const key of ['terrain', 'street', 'buildings', 'trees', 'wood']) materials[key]?.color.lerpColors(day[key], dark[key], k)
   })
   return null
 }
@@ -758,7 +811,7 @@ export default function City({ city, terrain, parks, size, origin, destination, 
       <group rotation={TO_Y_UP}>
         <Ground terrain={terrain} parks={parks.parks} materials={materials} onPick={pick} />
         <Streets edges={city.edges} terrain={terrain} materials={materials} />
-        <Trees positions={parks.positions} colors={parks.colors} lifts={parks.lifts} materials={materials} />
+        <Trees trees={parks.trees} materials={materials} />
         <Buildings buildings={city.buildings} terrain={terrain} materials={materials} highlights={highlights} onPick={pick} />
         {route && <RouteShow key={route.id} city={city} terrain={terrain} route={route} walkCmd={walkCmd} onPhase={onPhase} progressRef={progressRef} />}
         {origin && <Beacon key={`o${origin.node}`} point={origin} terrain={terrain} color={ROUTE_COLORS.origin} label="Origin" />}
