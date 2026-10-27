@@ -1,5 +1,6 @@
 import ClipperLib from 'clipper-lib'
 import { makeProjection } from './project.js'
+import { roofOf } from './shapes.js'
 
 export const SPEED_M_PER_MIN = 80 // 4.8 km/h
 export const MINUTES = [5, 10, 15]
@@ -54,7 +55,8 @@ export function prepareCity({ kit, buildings, graph, zensus }) {
   const city = buildings.features.map((f) => {
     const rings = f.geometry.coordinates.map((r) => openRing(r).map(project))
     const p = f.properties
-    return { id: p.id, use: p.use, height: p.height, floorArea: p.floor_area_m2 ?? {}, rings, bbox: bboxOf(rings[0]) }
+    const b = { id: p.id, use: p.use, height: p.height, floors: p.floors, floorArea: p.floor_area_m2 ?? {}, rings, bbox: bboxOf(rings[0]) }
+    return { ...b, roof: roofOf(b) }
   })
 
   // A coarse grid over the buildings, so each street piece only checks the buildings close to it.

@@ -1,3 +1,15 @@
+/* Frutiger Aero: frosted glass panels with a glossy highlight, aqua buttons, sky gradients. */
+
+:root {
+  --aqua: #1ea1e6;
+  --aqua-deep: #0a6fb8;
+  --ink: #12324a;
+  --ink-soft: #3e5a6e;
+  --glass: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(236, 249, 255, 0.62) 100%);
+  --glass-edge: rgba(255, 255, 255, 0.95);
+  --glass-shadow: 0 10px 34px rgba(0, 70, 130, 0.22), 0 2px 6px rgba(0, 70, 130, 0.12);
+}
+
 html,
 body,
 #root {
@@ -6,10 +18,10 @@ body,
 }
 
 body {
-  font-family: system-ui, sans-serif;
+  font-family: 'Segoe UI', Frutiger, 'Frutiger Linotype', 'Myriad Pro', 'Helvetica Neue', system-ui, sans-serif;
   font-size: 14px;
-  background: #f7f6f2;
-  color: #1c1c1c;
+  background: linear-gradient(180deg, #1677d2 0%, #7fd0ff 45%, #effcff 58%, #bfe88f 62%, #6cc04a 80%, #2f8a34 100%);
+  color: var(--ink);
 }
 
 .app {
@@ -23,48 +35,81 @@ body {
 }
 
 .loading {
-  color: #555;
+  color: #fff;
   position: absolute;
   inset: 45% 0 auto;
   text-align: center;
+  font-size: 16px;
+  text-shadow: 0 1px 6px rgba(0, 60, 120, 0.5);
+}
+
+.panel,
+.legend,
+.attribution {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 .panel,
 .legend {
   position: absolute;
-  top: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 6px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-  padding: 12px 14px;
+  top: 14px;
+  border-radius: 18px;
+  padding: 14px 16px;
   line-height: 1.4;
-  max-height: calc(100% - 70px);
+  max-height: calc(100% - 76px);
   overflow-y: auto;
 }
 
+/* the glossy shine across the top half of each glass panel */
+.panel::before,
+.legend::before {
+  content: '';
+  position: absolute;
+  inset: 1px 1px auto;
+  height: 46px;
+  border-radius: 17px 17px 40% 40% / 17px 17px 18px 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.panel > *,
+.legend > * {
+  position: relative;
+}
+
 .panel {
-  left: 12px;
+  left: 14px;
   width: 320px;
 }
 
 .legend {
-  right: 12px;
+  right: 14px;
   font-size: 12px;
 }
 
 h1 {
-  font-size: 17px;
-  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 600;
+  margin: 2px 0 6px;
+  background: linear-gradient(180deg, #1a8ad8, #075a9a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 h2 {
   font-size: 12px;
   margin: 0 0 6px;
   font-weight: 600;
+  color: var(--aqua-deep);
 }
 
 .hint {
-  color: #555;
+  color: var(--ink-soft);
   margin: 0 0 10px;
 }
 
@@ -78,15 +123,15 @@ h2 {
   text-align: left;
   font-weight: 600;
   font-size: 12px;
-  color: #555;
-  border-bottom: 1px solid #ddd;
+  color: var(--ink-soft);
+  border-bottom: 1px solid rgba(30, 161, 230, 0.35);
   padding: 2px 10px 4px 0;
 }
 
 .results td {
   padding: 5px 10px 5px 0;
   vertical-align: top;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(30, 161, 230, 0.15);
   white-space: nowrap;
 }
 
@@ -95,18 +140,20 @@ h2 {
 }
 
 .note {
-  color: #666;
+  color: #4f6b7d;
   font-size: 12px;
 }
 
+/* round glossy swatches, like little glass beads */
 .swatch {
   display: inline-block;
-  width: 11px;
-  height: 11px;
-  border-radius: 2px;
-  margin-right: 6px;
-  vertical-align: -1px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: -2px;
+  border: 1px solid rgba(0, 60, 100, 0.2);
+  box-shadow: inset 0 3px 3px rgba(255, 255, 255, 0.75), inset 0 -2px 3px rgba(0, 40, 80, 0.18), 0 1px 2px rgba(0, 60, 110, 0.2);
 }
 
 .shops h2 {
@@ -127,28 +174,154 @@ h2 {
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 3px 4px;
+  padding: 4px 6px;
   border: 0;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(30, 161, 230, 0.15);
+  border-radius: 6px;
   background: none;
   font: inherit;
   font-size: 13px;
+  color: inherit;
   text-align: left;
   cursor: pointer;
 }
 
 .shops button:hover,
 .shops button.marked {
-  background: #f6e3d8;
+  background: linear-gradient(180deg, rgba(190, 236, 255, 0.9), rgba(150, 220, 250, 0.7));
 }
 
 .method {
   font-size: 12px;
-  color: #444;
+  color: var(--ink-soft);
 }
 
 .method p {
   margin: 0 0 6px;
+}
+
+/* glossy aqua buttons: a bright upper half over a deeper lower half */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(200, 235, 252, 0.8), rgba(235, 250, 255, 0.9));
+  box-shadow: inset 0 1px 3px rgba(0, 80, 140, 0.25);
+}
+
+.tabs button,
+.reset {
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.tabs button {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--ink-soft);
+}
+
+.tabs button:hover {
+  color: var(--aqua-deep);
+}
+
+.tabs button.active,
+.reset {
+  color: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 1px rgba(0, 60, 110, 0.45);
+  border: 1px solid #0b74bd;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.15) 49%, rgba(255, 255, 255, 0) 51%),
+    linear-gradient(180deg, #5cc8f5 0%, #1593dc 52%, #0b7cc8 53%, #3ab6ee 100%);
+  box-shadow: 0 2px 6px rgba(0, 90, 160, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.slider {
+  display: block;
+  margin: 0 0 10px;
+}
+
+.slider span {
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* a glass groove with a glossy aqua bead */
+.slider input {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.slider input::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #bfe6f8, #ecf9ff);
+  box-shadow: inset 0 1px 3px rgba(0, 80, 140, 0.35);
+}
+
+.slider input::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #bfe6f8, #ecf9ff);
+  box-shadow: inset 0 1px 3px rgba(0, 80, 140, 0.35);
+}
+
+.slider input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 1px solid #0b74bd;
+  background: radial-gradient(circle at 50% 30%, #ffffff 0%, #9fe0ff 35%, #1593dc 75%);
+  box-shadow: 0 2px 4px rgba(0, 80, 150, 0.4);
+}
+
+.slider input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid #0b74bd;
+  background: radial-gradient(circle at 50% 30%, #ffffff 0%, #9fe0ff 35%, #1593dc 75%);
+  box-shadow: 0 2px 4px rgba(0, 80, 150, 0.4);
+}
+
+.districts {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.districts li {
+  margin: 0 0 4px;
+}
+
+.districts li::marker {
+  color: var(--aqua);
+  font-weight: 600;
+}
+
+.reset {
+  margin: 0 0 12px;
+  padding: 5px 14px;
+}
+
+.reset:hover,
+.tabs button.active:hover {
+  filter: brightness(1.07) saturate(1.1);
 }
 
 .legend ul {
@@ -158,29 +331,32 @@ h2 {
 }
 
 .legend li {
-  margin: 2px 0;
+  margin: 3px 0;
 }
 
 .attribution {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 5px 12px;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  padding: 5px 14px;
+  border-radius: 999px;
   font-size: 11px;
-  color: #444;
-  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink-soft);
 }
 
 @media (max-width: 700px) {
   .panel {
     width: auto;
-    right: 12px;
+    right: 14px;
     max-height: 45%;
   }
   .legend {
     top: auto;
-    bottom: 60px;
+    bottom: 70px;
     max-height: 35%;
+  }
+  .attribution {
+    border-radius: 12px;
   }
 }

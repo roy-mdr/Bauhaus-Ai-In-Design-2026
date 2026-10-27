@@ -1,10 +1,25 @@
-# Walking reach: Weimar
+# Solarpunk Weimar and walking reach
 
-A 3D map of central Weimar that shows how far you can walk in 5, 10 and 15 minutes from any point, which buildings you reach, and about how many people live there.
+A 3D map of central Weimar with two tools. **Solarpunk**: click anywhere and today's city grows into a speculative solarpunk district around that point. **Walking reach**: click to see how far you can walk in 5, 10 and 15 minutes, which buildings you reach, and about how many people live there.
 
 ## What it does
 
-- Shows every building of the city kit in 3D, extruded from its footprint to its measured height, coloured by its main use (legend at the top right), with the pedestrian network drawn as thin lines.
+- Shows every building of the city kit in 3D, from its footprint and measured height, coloured by its main use (legend at the top right), with the pedestrian network drawn as thin lines. Windows, floor lines and a darker plinth are drawn on every facade; narrow, nearly rectangular buildings get a gable roof.
+- The look is "Frutiger Aero", the glossy optimism of the 2000s: the city stands on a round disc with a glass rim, under a dome that runs from grass green below the horizon to blue sky above, with a low sun in the west-south-west and its lens flares; buildings are glossy with aqua window glass, and the panels are frosted glass with aqua buttons.
+- The tabs at the top of the panel choose what a click does.
+
+### Solarpunk
+
+- Click on the ground or a building: a district grows out from that point to the radius set with the slider (120 to 420 m), over 7 seconds, with a soft edge. Click elsewhere to grow more districts (up to 8); "Reset the city" removes them.
+- Inside a district, today's buildings stay and change: flat roofs become gardens and solar fields, south-facing pitched roofs carry solar panels, plants climb the walls, and some flat-roofed buildings grow up to three terraced green storeys.
+- On open ground rise new buildings, highest near the centre: garden spires (round floor plates that swell and sway, a hedge on every floor, hanging gardens, cantilevered terraces with trees and a crown of solar "leaves") and terraced hills (glass storeys that shrink and turn as they rise, each roof a garden).
+- Glass skybridges with planted decks join neighbouring towers, and people walk across them.
+- A sky tram runs on a loop between platforms on the tallest towers; air taxis circle above and a solar airship drifts around the district.
+- The ground turns into meadow with flowers and trees, the streets get solar trees, people walk the streets and turn at junctions, and small groups rest on the meadows.
+- The panel lists, for each district, how many towers, skybridges, crowned buildings, trees, solar trees and people it has.
+
+### Walking reach
+
 - Click on the ground (or on a building) to start a walk. The app draws three nested areas in three shades of orange: dark for 5, middle for 10, light for 15 minutes. Buildings touching an area take its shade.
 - The panel lists, for each of the three times, the number of buildings reached and about how many residents live in the area.
 - Drag to orbit, right-drag to pan, scroll to zoom.
@@ -29,6 +44,14 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 - **Residents:** from the Zensus 2022 grid of 100 m cells. For every cell that overlaps the area, its population times the share of the cell's area that lies inside the area. These are added up and rounded to the nearest 10.
 - **Cells without a figure:** some cells have no published population (`null`). They are not zero: they are left out of the sum, and the panel shows next to it how many such cells overlap the area.
 
+## How the solarpunk districts are placed
+
+- **Towers:** on a grid of points every 11 m inside the radius, keep those at least 9 m from any building and 6 m from any street, and pick the most open ones, at least 55 m apart: at most the radius squared divided by 5,500, so 10 towers for 240 m. Where there is too little open ground, up to three towers grow out of the roofs of large flat-roofed buildings. Height falls from about 165 m at the centre to 55 m at the edge, with some variation.
+- **Skybridges:** each tower links to its one or two nearest neighbours between 25 and 160 m away, at a random height between their bases and tops.
+- **Trees, people, solar trees:** trees on a 7 m grid wherever there is no building, street or tower; solar trees every 34 m beside the streets; walkers spread over the streets by length.
+- **Pitched roofs:** a building gets a gable roof when it has no courtyard, fills at least 82% of its smallest surrounding rectangle, is 5 to 18 m wide and at least 6 m high, and is not a transport, sport or light-industrial building. The roof rises at 42°, its ridge along the longer side, and ends at the building's measured height.
+- The same click always grows the same district.
+
 ## Limits
 
 - The walk starts at a street node, not at the exact click point; the few metres from the click to the node are not counted.
@@ -37,6 +60,7 @@ On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to 
 - The 25 m band is a stand-in for "close to the street"; it does not know where the entrances of buildings are.
 - Residents are spread evenly over each 100 m cell, which is rarely true. The census also changes small counts slightly at random to protect privacy, so single cells are approximate. Treat the numbers as "about".
 - The kit covers only part of Weimar. Areas near its edge are cut off by the end of the network, and residents outside the kit's census cells are not counted.
+- The solarpunk districts are a speculative picture, not a plan. Towers stand on ground the kit shows as free, not on real plots, and ignore ownership, heritage protection, structure and planning law. The gable roofs are a guess from the footprint's shape: the data has heights but no roof shapes, and windows are drawn as a pattern, not where real windows are.
 
 ## Data sources
 
@@ -54,5 +78,5 @@ Buildings: 3D building models LoD2 © GDI-Th (dl-de/by-2-0). Land use and pedest
 
 1. Tools: Claude Code, with the model Claude Opus 5.5.
 2. I decided:
-3. The agent did: read the data and `SOURCES.md`, then wrote the 3D city, the walking and resident calculation, the panel and this README, and checked the page in a headless browser.
+3. The agent did: read the data and `SOURCES.md`, then wrote the 3D city, the walking and resident calculation, the panel and this README; later added detailed facades and gable roofs and the growing solarpunk districts, and checked the page in a headless browser.
 4. I checked:

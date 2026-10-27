@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import City from './City.jsx'
 import { prepareCity, computeReach, MINUTES, SPEED_M_PER_MIN, BAND_M, MAX_SNAP_M } from './reach.js'
+import { growDistrict, GROW_SECONDS, MAX_DISTRICTS } from './solarpunk.js'
 import { USES, REACH_COLORS, labelForUse } from './colors.js'
 
 const FILES = { kit: 'kit.json', buildings: 'buildings.geojson', graph: 'streets.graph.json', zensus: 'zensus.geojson' }
@@ -16,6 +17,10 @@ export default function App() {
   const [error, setError] = useState(null)
   const [reach, setReach] = useState(null)
   const [marked, setMarked] = useState(null) // the building index of the shop picked in the list
+  const [mode, setMode] = useState('solarpunk') // what a click does: grow a solarpunk district, or walk
+  const [districts, setDistricts] = useState([])
+  const [radius, setRadius] = useState(240)
+  const [notice, setNotice] = useState(null)
 
   useEffect(() => {
     Promise.all(
@@ -32,20 +37,87 @@ export default function App() {
 
   const city = useMemo(() => data && prepareCity(data), [data])
 
+  const pick = (xy) => {
+    if (mode === 'reach') {
+      setReach(computeReach(city, xy))
+      setMarked(null)
+      return
+    }
+    if (districts.length >= MAX_DISTRICTS) {
+      setNotice(`The city holds up to ${MAX_DISTRICTS} districts. Reset to start again.`)
+      return
+    }
+    setNotice(null)
+    setDistricts([...districts, growDistrict(city, xy, radius, performance.now())])
+  }
+
   return (
     <div className="app">
       {city ? (
-        <City city={city} size={data.kit.size_m} reach={reach} marked={marked}
-          onPick={(xy) => {
-            setReach(computeReach(city, xy))
-            setMarked(null)
-          }}
-        />
+        <City city={city} size={data.kit.size_m} reach={mode === 'reach' ? reach : null} marked={mode === 'reach' ? marked : null} districts={districts} onPick={pick} />
       ) : (
         <p className="loading">{error ? `The city kit didn't load (${error}).` : 'Loading the city kit…'}</p>
       )}
 
       <aside className="panel">
+        <div className="tabs" role="tablist">
+          <button role="tab" aria-selected={mode === 'solarpunk'} className={mode === 'solarpunk' ? 'active' : ''} onClick={() => setMode('solarpunk')}>
+            Solarpunk
+          </button>
+          <button role="tab" aria-selected={mode === 'reach'} className={mode === 'reach' ? 'active' : ''} onClick={() => setMode('reach')}>
+            Walking reach
+          </button>
+        </div>
+
+        {mode === 'solarpunk' ? (
+          <section className="solarpunk">
+            <h1>Solarpunk Weimar</h1>
+            <p className="hint">
+              Click anywhere in the city: from there, today's Weimar grows into a solarpunk district within the radius
+              below, over {GROW_SECONDS} seconds and with a soft edge. Click again elsewhere to grow more.
+            </p>
+            <label className="slider">
+              <span>
+                Radius <strong>{radius} m</strong>
+              </span>
+              <input type="range" min={120} max={420} step={10} value={radius} onChange={(e) => setRadius(Number(e.target.value))} />
+            </label>
+            {notice && <p className="error">{notice}</p>}
+            {districts.length > 0 && (
+              <>
+                <ol className="districts">
+                  {districts.map((d, i) => (
+                    <li key={d.born}>
+                      <strong>District {i + 1}</strong>, {d.radius} m:{' '}
+                      <span className="note">
+                        {d.stats.towers} towers, {d.stats.bridges} skybridges, {d.stats.crowned} buildings with new green storeys,{' '}
+                        {fmt(d.stats.trees)} trees, {d.stats.solarTrees} solar trees, {fmt(d.stats.people)} people
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <button className="reset" onClick={() => (setDistricts([]), setNotice(null))}>
+                  Reset the city
+                </button>
+              </>
+            )}
+            <div className="method">
+              <p>
+                <strong>What grows.</strong> Existing buildings stay: their flat roofs become gardens and solar fields,
+                south-facing pitched roofs carry solar panels, plants climb the walls, and some flat-roofed buildings
+                grow terraced green storeys. On open ground, away from streets and buildings, rise garden spires and
+                terraced towers, highest near the centre, joined by glass skybridges with planted decks. A sky tram
+                circles between stations on the tallest towers; air taxis and a solar airship fly above. Streets get
+                solar trees, the ground turns into meadow with trees, and people walk the streets and bridges.
+              </p>
+              <p>
+                This is a speculative picture, not a plan: towers are placed by simple rules on open ground in the kit
+                data, not on real plots or by any planning law.
+              </p>
+            </div>
+          </section>
+        ) : (
+          <section>
         <h1>Walking reach</h1>
         <p className="hint">Click on the ground to start walking from the nearest street node. Drag to orbit, right-drag to pan, scroll to zoom.</p>
 
@@ -128,6 +200,8 @@ export default function App() {
             published figure are left out of the sum, not counted as zero; their number is shown next to it.
           </p>
         </div>
+          </section>
+        )}
       </aside>
 
       <aside className="legend">
