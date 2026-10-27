@@ -44,6 +44,8 @@ npm run build   build the site into dist/, as GitHub Pages does
 
 On GitHub, set Settings → Pages → Source to "GitHub Actions"; every push to `main` then publishes the app at `https://<user>.github.io/<repo>/`.
 
+A one-minute demo video is published at `https://<user>.github.io/<repo>/demo/` (locally `http://localhost:5173/demo/`). The page is `demo/index.html`; the video is `public/demo.mov` (H.264, 1920 × 1080).
+
 ## Method
 
 - **Walking speed:** 4.8 km/h, that is 80 m per minute, so 400, 800 and 1200 m for 5, 10 and 15 minutes.

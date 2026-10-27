@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solarpunk Weimar · Demo</title>
+    <link rel="icon" href="data:," />
+    <!-- The demo video at <site>/demo/. The video itself is public/demo.mov, published next to the
+         app; the relative path ../demo.mov works on localhost and on GitHub Pages alike. -->
+    <style>
+      :root {
+        --ink: #12324a;
+        --ink-soft: #3e5a6e;
+        --glass: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(236, 249, 255, 0.62) 100%);
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+      body {
+        font-family: 'Segoe UI', Frutiger, 'Frutiger Linotype', 'Myriad Pro', 'Helvetica Neue', system-ui, sans-serif;
+        color: var(--ink);
+        background: linear-gradient(180deg, #1677d2 0%, #7fd0ff 45%, #effcff 58%, #bfe88f 62%, #6cc04a 80%, #2f8a34 100%) fixed;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        padding: 16px;
+        box-sizing: border-box;
+      }
+      main {
+        position: relative;
+        width: min(1100px, 100%);
+        padding: 18px 20px 16px;
+        border-radius: 20px;
+        background: var(--glass);
+        -webkit-backdrop-filter: blur(16px) saturate(1.5);
+        backdrop-filter: blur(16px) saturate(1.5);
+        border: 1px solid rgba(255, 255, 255, 0.95);
+        box-shadow: 0 10px 34px rgba(0, 70, 130, 0.22), 0 2px 6px rgba(0, 70, 130, 0.12), inset 0 1px 0 #fff;
+        box-sizing: border-box;
+      }
+      main::before {
+        content: '';
+        position: absolute;
+        inset: 1px 1px auto;
+        height: 50px;
+        border-radius: 19px 19px 40% 40% / 19px 19px 18px 18px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0));
+        pointer-events: none;
+      }
+      header {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 600;
+        background: linear-gradient(180deg, #1a8ad8, #075a9a);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      p {
+        position: relative;
+        margin: 10px 2px 0;
+        font-size: 13px;
+        color: var(--ink-soft);
+      }
+      video {
+        position: relative;
+        display: block;
+        width: 100%;
+        max-height: calc(100vh - 170px);
+        border-radius: 12px;
+        background: #0d2233;
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        box-shadow: 0 6px 20px rgba(0, 50, 100, 0.3);
+      }
+      .aqua-button {
+        display: inline-block;
+        padding: 6px 18px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        color: #fff;
+        text-shadow: 0 1px 1px rgba(0, 60, 110, 0.45);
+        border: 1px solid #0b74bd;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.15) 49%, rgba(255, 255, 255, 0) 51%),
+          linear-gradient(180deg, #5cc8f5 0%, #1593dc 52%, #0b7cc8 53%, #3ab6ee 100%);
+        box-shadow: 0 2px 6px rgba(0, 90, 160, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      }
+      .aqua-button:hover {
+        filter: brightness(1.06);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Solarpunk Weimar · Demo</h1>
+        <a class="aqua-button" href="../">Open the app ▶</a>
+      </header>
+      <video src="../demo.mov" controls playsinline preload="metadata">
+        Your browser can't play this video. <a href="../demo.mov">Download demo.mov</a> instead.
+      </video>
+      <p>A one-minute demo of Solarpunk Weimar. Open the app to try it yourself.</p>
+    </main>
+  </body>
+</html>

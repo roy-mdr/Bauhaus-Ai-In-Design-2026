@@ -13,4 +13,13 @@ export default defineConfig({
   // Replicate key from .env in Node, so the key never reaches the page. GitHub Pages has no such server.
   plugins: [react(), replicateRenderPlugin(fileURLToPath(new URL('.', import.meta.url)))],
   base,
+  // Two pages: the app, and the demo video at <site>/demo/ (which plays public/demo.mov).
+  build: {
+    rollupOptions: {
+      input: {
+        app: fileURLToPath(new URL('index.html', import.meta.url)),
+        demo: fileURLToPath(new URL('demo/index.html', import.meta.url)),
+      },
+    },
+  },
 })
