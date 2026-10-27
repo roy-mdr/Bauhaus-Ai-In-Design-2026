@@ -7,7 +7,7 @@ import { Sky, SunFlare, DiscRim, SUN_POSITION } from './Aero.jsx'
 import { boxPoint } from './shapes.js'
 import { makeBuildingMaterial, makeGroundMaterial } from './cityMaterials.js'
 import SolarCity from './Solarpunk.jsx'
-import PhotoRig from './PhotoRig.jsx'
+import PhotoRig, { Snapshot } from './PhotoRig.jsx'
 
 // The scene is built in metres with x to the east, y to the north and z up.
 // One rotation of the whole group turns it into three.js's "y is up".
@@ -168,7 +168,7 @@ function ShopMarker({ building }) {
   )
 }
 
-export default function City({ city, size, reach, marked, districts, photo, onPick, onStand }) {
+export default function City({ city, size, reach, marked, districts, photo, captureRef, onPick, onStand }) {
   // Ignore clicks that end a drag (orbiting or panning).
   const pick = (e) => {
     e.stopPropagation()
@@ -191,6 +191,7 @@ export default function City({ city, size, reach, marked, districts, photo, onPi
       {/* how far and how steeply the camera may move is set by PhotoRig, for the map and for eye level */}
       <OrbitControls makeDefault />
       <PhotoRig photo={photo} />
+      {captureRef && <Snapshot captureRef={captureRef} />}
       <Sky />
       <SunFlare />
       <group rotation={TO_Y_UP}>

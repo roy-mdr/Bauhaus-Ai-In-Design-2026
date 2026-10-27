@@ -294,13 +294,17 @@ const STANDABLE = new THREE.MeshBasicMaterial({ visible: false, side: THREE.Doub
 const PLANT_CLEARANCE_M = 1.2
 
 function Standable({ district, onStand }) {
-  const geometry = useMemo(() => {
-    const pos = []
-    for (const { z, pts } of district.stand)
-      for (let k = 1; k < pts.length - 1; k++) pos.push(...pts[0], z, ...pts[k], z, ...pts[k + 1], z)
+  // kinds[i] tells what triangle i belongs to (a bridge, a spire's floor, a roof garden...)
+  const { geometry, kinds } = useMemo(() => {
+    const pos = [], kinds = []
+    for (const { z, pts, kind } of district.stand)
+      for (let k = 1; k < pts.length - 1; k++) {
+        pos.push(...pts[0], z, ...pts[k], z, ...pts[k + 1], z)
+        kinds.push(kind)
+      }
     const g = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
     g.computeBoundingSphere()
-    return g
+    return { geometry: g, kinds }
   }, [district])
   useEffect(() => () => geometry.dispose(), [geometry])
   // The plants up on floors and bridges (trunks, crowns, hanging gardens), each as an upright
@@ -327,7 +331,7 @@ function Standable({ district, onStand }) {
         if (d >= clear) continue
         ;[x, y] = d > 0.01 ? [px + (dx * clear) / d, py + (dy * clear) / d] : [px + clear, py]
       }
-    onStand([x, y, z])
+    onStand([x, y, z], kinds[e.faceIndex] ?? 'bridge')
   }
   return <mesh geometry={geometry} material={STANDABLE} onClick={stand} />
 }

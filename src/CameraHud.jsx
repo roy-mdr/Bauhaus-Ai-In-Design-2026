@@ -2,7 +2,7 @@ import { FOCAL_MM, EYE_HEIGHT_M } from './photo.js'
 
 // The screen of a 2000s compact digital camera, laid over the view at eye level: frame corners,
 // a grid, focus brackets, shooting settings, a battery, an orange date stamp and a shutter button.
-// The shutter does nothing yet.
+// The shutter calls onShutter; each new flashKey fires the white flash once.
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -28,7 +28,7 @@ function CameraIcon() {
 }
 
 // standing: how high the citizen stands above the ground, in metres (0 on the street).
-export default function CameraHud({ standing = 0, onExit }) {
+export default function CameraHud({ standing = 0, shots = 128, busy = false, flashKey = 0, onShutter, onExit }) {
   const now = new Date()
   const stamp = `'${pad(now.getFullYear() % 100)} ${pad(now.getMonth() + 1)} ${pad(now.getDate())}`
 
@@ -48,7 +48,7 @@ export default function CameraHud({ standing = 0, onExit }) {
         <CameraIcon />
         <span>4M</span>
         <span className="hud-fine">FINE</span>
-        <span>[0128]</span>
+        <span>[{String(shots).padStart(4, '0')}]</span>
       </div>
       <div className="hud-top-right">
         <span>⚡A</span>
@@ -78,15 +78,16 @@ export default function CameraHud({ standing = 0, onExit }) {
       <div className="hud-date">{stamp}</div>
 
       <div className="hud-controls">
-        <button className="hud-shutter" aria-label="Take picture" title="Take picture">
+        <button className="hud-shutter" aria-label="Take picture" title="Take picture" disabled={busy} onClick={onShutter}>
           <span />
         </button>
-        <span className="hud-caption">Take picture</span>
+        <span className="hud-caption">{busy ? 'Developing…' : 'Take picture'}</span>
       </div>
       <button className="hud-exit" onClick={onExit}>
         ◀ Back to map
       </button>
       <p className="hud-hint">Drag to look around · click a spot, bridge or terrace to go there</p>
+      {flashKey > 0 && <div key={flashKey} className="hud-flash" />}
     </div>
   )
 }

@@ -1,10 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import City from './City.jsx'
 import { prepareCity, computeReach, MINUTES, SPEED_M_PER_MIN, BAND_M, MAX_SNAP_M } from './reach.js'
 import { growDistrict, GROW_SECONDS, MAX_DISTRICTS } from './solarpunk.js'
 import { USES, REACH_COLORS, labelForUse } from './colors.js'
 import { standPoint, EYE_HEIGHT_M, FOCAL_MM } from './photo.js'
 import CameraHud from './CameraHud.jsx'
+import PhotoViewer from './PhotoViewer.jsx'
+import { photoPrompt } from './photoPrompt.js'
+
+// Rendering photos uses the Replicate key, which only the local dev server (npm run dev) can read
+// from .env; the page itself never sees it. On GitHub Pages there is no such server.
+const LOCAL_ONLY =
+  'Rendering photos only works when the app runs on your laptop with "npm run dev": it uses your Replicate key from .env, which never goes into the web page.'
+
+const pad2 = (n) => String(n).padStart(2, '0')
+const photoName = (d) =>
+  `weimar-solarpunk-${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}.png`
 
 const FILES = { kit: 'kit.json', buildings: 'buildings.geojson', graph: 'streets.graph.json', zensus: 'zensus.geojson' }
 
@@ -23,7 +34,12 @@ export default function App() {
   const [districts, setDistricts] = useState([])
   const [radius, setRadius] = useState(240)
   const [notice, setNotice] = useState(null)
-  const [photo, setPhoto] = useState(null) // in photo mode: where the citizen stands, { eye: [x, y] }
+  const [photo, setPhoto] = useState(null) // in photo mode: where the citizen stands, { eye: [x, y], z, on }
+  const [shot, setShot] = useState(null) // the photo being developed or shown, see PhotoViewer
+  const [shots, setShots] = useState(128) // "shots left" on the camera screen
+  const [flashKey, setFlashKey] = useState(0)
+  const captureRef = useRef(null)
+  const request = useRef(null)
 
   useEffect(() => {
     Promise.all(
@@ -42,7 +58,8 @@ export default function App() {
 
   const pick = (xy) => {
     if (mode === 'photo') {
-      setPhoto({ eye: standPoint(city, xy) })
+      const eye = standPoint(city, xy)
+      setPhoto({ eye, z: 0, on: eye === xy ? 'ground' : 'street' })
       return
     }
     if (mode === 'reach') {
@@ -58,6 +75,42 @@ export default function App() {
     setDistricts([...districts, growDistrict(city, xy, radius, performance.now())])
   }
 
+  // The shutter: flash, capture the view, describe it, and let Replicate develop it into a photograph.
+  const takePicture = async () => {
+    if (!captureRef.current || shot?.status === 'developing') return
+    setFlashKey((k) => k + 1)
+    const view = captureRef.current()
+    const [x, y] = photo.eye
+    const away = (d) => Math.hypot(x - d.center[0], y - d.center[1]) - d.radius
+    const district = districts.some((d) => away(d) <= 0) ? 'inside' : districts.some((d) => away(d) <= 600) ? 'near' : 'none'
+    const prompt = photoPrompt({ on: photo.on, standing: photo.z ?? 0, pitch: view.pitch, sun: view.sun, district })
+    const name = photoName(new Date())
+    const controller = new AbortController()
+    request.current = controller
+    setShot({ status: 'developing', capture: view.image, name })
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: view.image, prompt }),
+        signal: controller.signal,
+      })
+      const body = await res.json().catch(() => null)
+      if (!body) throw new Error(LOCAL_ONLY)
+      if (!res.ok) throw new Error(body.error)
+      setShot((s) => (s?.name === name ? { ...s, status: 'done', image: body.image } : s))
+      setShots((n) => Math.max(0, n - 1))
+    } catch (e) {
+      if (e.name === 'AbortError') return
+      setShot((s) => (s?.name === name ? { ...s, status: 'error', error: e.message === 'Failed to fetch' ? LOCAL_ONLY : e.message } : s))
+    }
+  }
+
+  const closeShot = () => {
+    request.current?.abort()
+    setShot(null)
+  }
+
   const choose = (m) => {
     setMode(m)
     if (m !== 'photo') setPhoto(null)
@@ -66,14 +119,19 @@ export default function App() {
   return (
     <div className="app">
       {city ? (
-        <City city={city} size={data.kit.size_m} reach={mode === 'reach' ? reach : null} marked={mode === 'reach' ? marked : null} districts={districts} photo={photo} onPick={pick}
-          onStand={mode === 'photo' ? ([x, y, z]) => setPhoto({ eye: [x, y], z }) : null}
+        <City city={city} size={data.kit.size_m} reach={mode === 'reach' ? reach : null} marked={mode === 'reach' ? marked : null} districts={districts} photo={photo} captureRef={captureRef} onPick={pick}
+          onStand={mode === 'photo' ? ([x, y, z], on) => setPhoto({ eye: [x, y], z, on }) : null}
         />
       ) : (
         <p className="loading">{error ? `The city kit didn't load (${error}).` : 'Loading the city kit…'}</p>
       )}
 
-      {photo && <CameraHud standing={photo.z ?? 0} onExit={() => setPhoto(null)} />}
+      {photo && (
+        <CameraHud standing={photo.z ?? 0} shots={shots} busy={shot?.status === 'developing'} flashKey={flashKey}
+          onShutter={takePicture} onExit={() => setPhoto(null)}
+        />
+      )}
+      {shot && <PhotoViewer shot={shot} onClose={closeShot} />}
 
       <aside className="panel" hidden={!!photo}>
         <div className="tabs" role="tablist">
@@ -100,7 +158,11 @@ export default function App() {
                 At eye level, drag to look around and click another spot to walk there. "Back to map" takes you back up.
                 Grow some solarpunk districts first to stand among their towers, trees and people.
               </p>
-              <p>The shutter button does not take pictures yet.</p>
+              <p>
+                The round shutter button takes a picture: Replicate turns the view into a realistic photograph of
+                solarpunk Weimar in the Frutiger Aero style, with lens flares and a natural landscape at the horizon, and
+                you can download it. This needs the app running on your laptop with "npm run dev".
+              </p>
             </div>
           </section>
         ) : mode === 'solarpunk' ? (

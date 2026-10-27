@@ -36,14 +36,14 @@ function collector() {
     ;(layers[layer] ??= []).push({ p, q: [q.x, q.y, q.z, q.w], s, color, d, h })
   }
   // Surfaces a person can stand on in photo mode (bridge decks, floors, terraces, roof gardens),
-  // each a flat convex outline at height z.
+  // each a flat convex outline at height z, with its kind (one of STAND_KINDS) for the photo's description.
   const stand = []
-  const standRect = (x, y, w, dd, yaw, z) => {
+  const standRect = (x, y, w, dd, yaw, z, kind) => {
     const c = Math.cos(yaw), s = Math.sin(yaw)
-    stand.push({ z, pts: [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [x + (c * u * w - s * v * dd) / 2, y + (s * u * w + c * v * dd) / 2]) })
+    stand.push({ z, kind, pts: [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [x + (c * u * w - s * v * dd) / 2, y + (s * u * w + c * v * dd) / 2]) })
   }
-  const standDisc = (x, y, r, z) =>
-    stand.push({ z, pts: Array.from({ length: 16 }, (_, k) => [x + Math.cos((k / 16) * TAU) * r, y + Math.sin((k / 16) * TAU) * r]) })
+  const standDisc = (x, y, r, z, kind) =>
+    stand.push({ z, kind, pts: Array.from({ length: 16 }, (_, k) => [x + Math.cos((k / 16) * TAU) * r, y + Math.sin((k / 16) * TAU) * r]) })
   return { layers, add, stand, standRect, standDisc }
 }
 
@@ -110,7 +110,7 @@ function gardenSpire(add, rand, t, { standDisc }) {
     const sway = Math.sin(s * Math.PI) * r0 * 0.35
     const x = p[0] + Math.cos(swayDir) * sway, y = p[1] + Math.sin(swayDir) * sway
     add('slab', { p: [x, y, z], s: [r, r, 0.5], color: C.slab, d, h })
-    if (i > 0) standDisc(x, y, r, z + 0.5)
+    if (i > 0) standDisc(x, y, r, z + 0.5, 'spireFloor')
     add('glass', { p: [x, y, z + 0.5], s: [r * 0.88, r * 0.88, fh - 0.5], color: C.glass, d, h })
     add('hedge', { p: [x, y, z + 0.75], s: [r * 0.97, r * 0.97, 1.6], color: C.leaves[i % C.leaves.length], d, h })
     if (i % 2 === 0)
@@ -123,7 +123,7 @@ function gardenSpire(add, rand, t, { standDisc }) {
       const tx = x + Math.cos(a) * r * 0.95, ty = y + Math.sin(a) * r * 0.95, tr = r * 0.55
       add('slab', { p: [tx, ty, z], s: [tr, tr, 0.6], color: C.slab, d, h })
       add('lawnDisc', { p: [tx, ty, z + 0.6], s: [tr * 0.94, tr * 0.94, 0.3], color: C.lawn, d, h })
-      standDisc(tx, ty, tr * 0.94, z + 0.9)
+      standDisc(tx, ty, tr * 0.94, z + 0.9, 'spireTerrace')
       for (let k = 0; k < 2; k++) {
         const b = rand() * TAU, rr = tr * 0.5 * rand()
         tree(add, rand, tx + Math.cos(b) * rr, ty + Math.sin(b) * rr, z + 0.9, 1.6 + rand(), d, h)
@@ -134,7 +134,7 @@ function gardenSpire(add, rand, t, { standDisc }) {
   }
   add('slab', { p: top, s: [rTop, rTop, 0.5], color: C.slab, d, h: 0.93 })
   add('lawnDisc', { p: [top[0], top[1], top[2] + 0.5], s: [rTop * 0.92, rTop * 0.92, 0.3], color: C.lawn, d, h: 0.93 })
-  standDisc(top[0], top[1], rTop * 0.92, top[2] + 0.8)
+  standDisc(top[0], top[1], rTop * 0.92, top[2] + 0.8, 'spireRoof')
   const mastTop = top[2] + 7 + H * 0.06
   add('struct', { p: top, s: [0.9, 0.9, mastTop - top[2]], color: C.struct, d, h: 0.95 })
   const K = 9 + Math.floor(rand() * 5)
@@ -167,7 +167,7 @@ function terraceHill(add, rand, t, { standRect }) {
     add('struct', { p: [p[0], p[1], z], s: [w, dd, 0.5], yaw, color: C.slab, d, h })
     add('glassBox', { p: [p[0], p[1], z + 0.5], s: [w * 0.94, dd * 0.94, fh - 0.5], yaw, color: C.glass, d, h })
     add('lawn', { p: [p[0], p[1], z + fh], s: [w, dd, 0.35], yaw, color: C.lawn, d, h: h + 0.05 })
-    standRect(p[0], p[1], w, dd, yaw, z + fh + 0.35)
+    standRect(p[0], p[1], w, dd, yaw, z + fh + 0.35, 'hillTerrace')
     const corner = (cu, cv) => [p[0] + Math.cos(yaw) * cu - Math.sin(yaw) * cv, p[1] + Math.sin(yaw) * cu + Math.cos(yaw) * cv]
     for (const [su, sv] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
       const [x, y] = corner((su * w) / 2.15, (sv * dd) / 2.15)
@@ -199,7 +199,7 @@ function crownExisting(add, rand, b, d, { standRect }) {
     add('struct', { p: [x, y, z], s: [u1 - u0, v1 - v0, 0.4], yaw, color: C.slab, d, h })
     add('glassBox', { p: [x, y, z + 0.4], s: [(u1 - u0) * 0.95, (v1 - v0) * 0.95, 3.4], yaw, color: C.glass, d, h })
     add('lawn', { p: [x, y, z + 3.8], s: [u1 - u0, v1 - v0, 0.3], yaw, color: C.lawn, d, h: h + 0.05 })
-    standRect(x, y, u1 - u0, v1 - v0, yaw, z + 4.1)
+    standRect(x, y, u1 - u0, v1 - v0, yaw, z + 4.1, 'crown')
     for (let k = 0; k < 2; k++) {
       const [tx, ty] = boxPoint(box, u0 + (u1 - u0) * (0.2 + 0.6 * rand()), v0 + (v1 - v0) * (0.2 + 0.6 * rand()))
       tree(add, rand, tx, ty, z + 4.1, 1.4 + rand(), d, h + 0.1)
@@ -279,7 +279,7 @@ export function growDistrict(city, center, radius, born) {
         const yaw = Math.atan2(dir.y, dir.x), mid = A.clone().add(B).multiplyScalar(0.5)
         const d = (a.d + b.d) / 2
         add('struct', { p: [mid.x, mid.y, z], s: [L, 4.5, 0.5], yaw, color: C.struct, d, h: 1 })
-        on.standRect(mid.x, mid.y, L, 4.5, yaw, z + 0.5)
+        on.standRect(mid.x, mid.y, L, 4.5, yaw, z + 0.5, 'bridge')
         add('glass', { p: [A.x, A.y, z + 2], s: [2.6, 2.6, L], dir, color: C.glass, d, h: 1 })
         for (const side of [-1, 1])
           add('lawn', { p: [mid.x - Math.sin(yaw) * side * 1.7, mid.y + Math.cos(yaw) * side * 1.7, z + 0.5], s: [L, 0.7, 0.45], yaw, color: C.lawn, d, h: 1 })
@@ -366,7 +366,7 @@ export function growDistrict(city, center, radius, born) {
       const r = (t.kind === 'hill' ? t.clear * 0.8 : t.r0) + 6
       const sx = t.p[0] + Math.cos(a) * r, sy = t.p[1] + Math.sin(a) * r
       add('slab', { p: [sx, sy, z - 0.6], s: [6, 6, 0.6], color: C.slab, d: t.d, h: 1 })
-      on.standDisc(sx, sy, 5.6, z)
+      on.standDisc(sx, sy, 5.6, z, 'platform')
       add('hedge', { p: [sx, sy, z], s: [5.8, 5.8, 0.8], color: C.leaves[0], d: t.d, h: 1 })
       add('struct', { p: [t.p[0] + Math.cos(a) * (r - 6), t.p[1] + Math.sin(a) * (r - 6), z - 0.6], s: [12, 3, 0.5], yaw: a, color: C.struct, d: t.d, h: 1 })
       return [sx + Math.cos(a) * 4, sy + Math.sin(a) * 4, z + 1.5]
