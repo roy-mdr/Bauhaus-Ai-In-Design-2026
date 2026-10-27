@@ -7,6 +7,7 @@ import { Sky, SunFlare, DiscRim, SUN_POSITION } from './Aero.jsx'
 import { boxPoint } from './shapes.js'
 import { makeBuildingMaterial, makeGroundMaterial } from './cityMaterials.js'
 import SolarCity from './Solarpunk.jsx'
+import PhotoRig from './PhotoRig.jsx'
 
 // The scene is built in metres with x to the east, y to the north and z up.
 // One rotation of the whole group turns it into three.js's "y is up".
@@ -167,7 +168,7 @@ function ShopMarker({ building }) {
   )
 }
 
-export default function City({ city, size, reach, marked, districts, onPick }) {
+export default function City({ city, size, reach, marked, districts, photo, onPick, onStand }) {
   // Ignore clicks that end a drag (orbiting or panning).
   const pick = (e) => {
     e.stopPropagation()
@@ -187,7 +188,9 @@ export default function City({ city, size, reach, marked, districts, onPick }) {
       <hemisphereLight args={[AERO.sky, '#cdeccf', 0.7]} />
       <ambientLight intensity={0.95} />
       <directionalLight position={SUN_POSITION} intensity={1.9} color="#fffaf0" />
-      <OrbitControls makeDefault maxPolarAngle={Math.PI / 2.1} minDistance={30} maxDistance={6000} />
+      {/* how far and how steeply the camera may move is set by PhotoRig, for the map and for eye level */}
+      <OrbitControls makeDefault />
+      <PhotoRig photo={photo} />
       <Sky />
       <SunFlare />
       <group rotation={TO_Y_UP}>
@@ -197,7 +200,7 @@ export default function City({ city, size, reach, marked, districts, onPick }) {
         <DiscRim radius={discRadius} />
         <Streets edges={city.edges} />
         <Buildings buildings={city.buildings} buildingLevel={reach?.buildingLevel} onPick={pick} />
-        <SolarCity districts={districts} />
+        <SolarCity districts={districts} onStand={onStand} />
         {reach?.levels?.map((l, level) => <Area key={level} polygons={l.polygons} level={level} />)}
         {marked != null && <ShopMarker building={city.buildings[marked]} />}
         {reach?.start && (

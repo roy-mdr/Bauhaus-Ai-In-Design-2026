@@ -220,8 +220,10 @@ h2 {
 }
 
 .tabs button {
-  flex: 1;
-  padding: 6px 10px;
+  flex: 1 1 auto;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  white-space: nowrap;
   border: 1px solid transparent;
   background: none;
   color: var(--ink-soft);
@@ -343,6 +345,235 @@ h2 {
   border-radius: 999px;
   font-size: 11px;
   color: var(--ink-soft);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* --- Photo mode: the screen of a 2000s compact digital camera --- */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* drags and clicks go through to the city, except on the buttons */
+  font-family: 'Lucida Console', Consolas, 'Courier New', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
+}
+
+.hud-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, 0.35) 100%);
+}
+
+.hud-grid {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.35) calc(33.33% - 0.5px), rgba(255, 255, 255, 0.35) calc(33.33% + 0.5px), transparent calc(33.33% + 0.5px)),
+    linear-gradient(90deg, transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.35) calc(66.66% - 0.5px), rgba(255, 255, 255, 0.35) calc(66.66% + 0.5px), transparent calc(66.66% + 0.5px)),
+    linear-gradient(180deg, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.35) calc(33.33% - 0.5px), rgba(255, 255, 255, 0.35) calc(33.33% + 0.5px), transparent calc(33.33% + 0.5px)),
+    linear-gradient(180deg, transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.35) calc(66.66% - 0.5px), rgba(255, 255, 255, 0.35) calc(66.66% + 0.5px), transparent calc(66.66% + 0.5px));
+}
+
+.hud-corner {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border: 0 solid #fff;
+  filter: drop-shadow(1px 1px 0 #000);
+}
+.hud-corner.tl { top: 28px; left: 28px; border-top-width: 3px; border-left-width: 3px; }
+.hud-corner.tr { top: 28px; right: 28px; border-top-width: 3px; border-right-width: 3px; }
+.hud-corner.bl { bottom: 52px; left: 28px; border-bottom-width: 3px; border-left-width: 3px; }
+.hud-corner.br { bottom: 52px; right: 28px; border-bottom-width: 3px; border-right-width: 3px; }
+
+/* the focus brackets in the middle, green as if focus were locked */
+.hud-af {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 96px;
+  height: 70px;
+  transform: translate(-50%, -50%);
+}
+.hud-af::before,
+.hud-af::after,
+.hud-af-box::before,
+.hud-af-box::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 14px;
+  border: 0 solid #5dff6a;
+  filter: drop-shadow(1px 1px 0 #000);
+}
+.hud-af::before { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; }
+.hud-af::after { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; }
+.hud-af-box::before { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; }
+.hud-af-box::after { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; }
+
+.hud-top-left,
+.hud-top-right,
+.hud-bottom-left {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.hud-top-left { top: 40px; left: 88px; }
+.hud-top-right { top: 40px; right: 88px; }
+.hud-bottom-left { bottom: 68px; left: 88px; }
+
+.hud-mode {
+  padding: 0 5px;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  box-shadow: 1px 1px 0 #000;
+}
+
+.hud-fine {
+  font-size: 12px;
+}
+
+.hud-note {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.hud-icon,
+.hud-battery {
+  width: 26px;
+  height: 18px;
+  color: #fff;
+  filter: drop-shadow(1px 1px 0 #000);
+}
+.hud-battery {
+  width: 32px;
+  color: #5dff6a;
+}
+
+.hud-exposure {
+  position: absolute;
+  left: 50%;
+  bottom: 68px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.hud-scale {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.hud-scale i {
+  display: block;
+  width: 2px;
+  height: 8px;
+  background: #fff;
+  box-shadow: 1px 1px 0 #000;
+}
+.hud-scale i.mark {
+  height: 14px;
+  background: #ffd23f;
+}
+
+/* the date stamp, burnt into the corner in orange like on prints from that time */
+.hud-date {
+  position: absolute;
+  right: 160px;
+  bottom: 66px;
+  font-size: 22px;
+  color: #ffa53a;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 6px rgba(255, 140, 30, 0.7), 1px 1px 0 #3a1a00;
+}
+
+.hud-controls {
+  position: absolute;
+  right: 36px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* a round, glossy silver shutter button with a red ring */
+.hud-shutter {
+  pointer-events: auto;
+  width: 74px;
+  height: 74px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid #d6262b;
+  background: radial-gradient(circle at 50% 30%, #ffffff 0%, #e4e8ec 35%, #9aa3ab 75%, #6e767d 100%);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.55), 0 4px 10px rgba(0, 0, 0, 0.45), inset 0 -4px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.hud-shutter span {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, #ffffff, #c9d0d6 60%, #8d969e);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.9), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.hud-shutter:active {
+  transform: scale(0.96);
+}
+.hud-caption {
+  font-size: 11px;
+}
+
+.hud-exit {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: 34px;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  font: inherit;
+  font-size: 13px;
+  color: #fff;
+  border: 1px solid #0b74bd;
+  border-radius: 999px;
+  text-shadow: 0 1px 1px rgba(0, 60, 110, 0.45);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.15) 49%, rgba(255, 255, 255, 0) 51%),
+    linear-gradient(180deg, #5cc8f5 0%, #1593dc 52%, #0b7cc8 53%, #3ab6ee 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.hud-hint {
+  position: absolute;
+  left: 50%;
+  top: 74px;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+@media (max-width: 700px) {
+  .hud-top-left { left: 40px; gap: 8px; }
+  .hud-top-right { right: 40px; gap: 8px; }
+  .hud-bottom-left { left: 40px; gap: 8px; font-size: 12px; bottom: 110px; }
+  .hud-exposure { bottom: 140px; }
+  .hud-date { right: 40px; bottom: 80px; font-size: 18px; }
+  .hud-exit { top: 80px; }
+  .hud-hint { top: 118px; }
 }
 
 @media (max-width: 700px) {

@@ -18,6 +18,13 @@ A 3D map of central Weimar with two tools. **Solarpunk**: click anywhere and tod
 - The ground turns into meadow with flowers and trees, the streets get solar trees, people walk the streets and turn at junctions, and small groups rest on the meadows.
 - The panel lists, for each district, how many towers, skybridges, crowned buildings, trees, solar trees and people it has.
 
+### Photo mode
+
+- Click a spot in the city to stand there as a citizen: the camera flies down to eye height (1.65 m) and widens to a 15 mm lens on a full-frame sensor (about 99° across). If you click inside a building, you stand on the nearest point of a street instead.
+- The view shows the screen of a 2000s compact digital camera: frame corners, a grid of thirds, green focus brackets, mode, image size and shots left, flash, white balance, battery, an exposure scale, shutter speed, aperture, ISO, focal length and an orange date stamp.
+- In a grown solarpunk district you can also stand up high: click a skybridge deck, a spire's floor, terrace or roof garden, a terraced tower's garden level, a new green storey on an old building, or a sky-tram platform (from above or below), and you stand on it at eye height. If the spot is right next to a tree or hanging garden, you are moved a step away so it doesn't fill the picture. The camera screen shows your eye height above the ground.
+- Drag to look around; click another spot to walk there; "Back to map" flies back up to where you were. The round shutter button does not take pictures yet.
+
 ### Walking reach
 
 - Click on the ground (or on a building) to start a walk. The app draws three nested areas in three shades of orange: dark for 5, middle for 10, light for 15 minutes. Buildings touching an area take its shade.

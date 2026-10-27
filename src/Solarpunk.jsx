@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { FEATHER_M, GROW_SECONDS, frontAt } from './solarpunk.js'
 import { solarUniforms } from './cityMaterials.js'
+import { EYE_HEIGHT_M } from './photo.js'
 import { SOLARPUNK as C } from './colors.js'
 
 const noRaycast = () => null
@@ -287,7 +288,51 @@ function Walkers({ district }) {
   return <instancedMesh ref={ref} args={[GEOMETRIES.person, MATERIALS.solid, people.length]} frustumCulled={false} raycast={noRaycast} />
 }
 
-function District({ district }) {
+// The surfaces you can stand on in photo mode (bridge decks, floors, terraces, roof gardens), as one
+// invisible mesh that only catches clicks, from above and below. A click on it stands you there.
+const STANDABLE = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+const PLANT_CLEARANCE_M = 1.2
+
+function Standable({ district, onStand }) {
+  const geometry = useMemo(() => {
+    const pos = []
+    for (const { z, pts } of district.stand)
+      for (let k = 1; k < pts.length - 1; k++) pos.push(...pts[0], z, ...pts[k], z, ...pts[k + 1], z)
+    const g = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    g.computeBoundingSphere()
+    return g
+  }, [district])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  // The plants up on floors and bridges (trunks, crowns, hanging gardens), each as an upright
+  // cylinder (x, y, bottom, top, radius), so you don't land with your head inside one.
+  const plants = useMemo(() => {
+    const raised = (name, f) => (district.layers[name] ?? []).filter((t) => t.p[2] > 1).map(f)
+    return [
+      ...raised('trunk', ({ p, s }) => [p[0], p[1], p[2], p[2] + s[2], s[0]]),
+      ...raised('leaf', ({ p, s }) => [p[0], p[1], p[2] - s[2], p[2] + s[2], s[0]]),
+      ...raised('conifer', ({ p, s }) => [p[0], p[1], p[2], p[2] + s[2], s[0]]),
+    ]
+  }, [district])
+  const stand = (e) => {
+    // Not while the district is still growing, and not at the end of a drag: let the click fall through.
+    if (e.delta > 5 || performance.now() - district.born < GROW_SECONDS * 1000) return
+    e.stopPropagation()
+    let x = e.point.x, y = -e.point.z
+    const z = e.point.y
+    for (let pass = 0; pass < 3; pass++)
+      for (const [px, py, bottom, top, r] of plants) {
+        if (top < z || bottom > z + EYE_HEIGHT_M + 0.6) continue
+        const clear = r + PLANT_CLEARANCE_M
+        const dx = x - px, dy = y - py, d = Math.hypot(dx, dy)
+        if (d >= clear) continue
+        ;[x, y] = d > 0.01 ? [px + (dx * clear) / d, py + (dy * clear) / d] : [px + clear, py]
+      }
+    onStand([x, y, z])
+  }
+  return <mesh geometry={geometry} material={STANDABLE} onClick={stand} />
+}
+
+function District({ district, onStand }) {
   return (
     <group>
       {Object.entries(district.layers).map(([name, items]) => {
@@ -297,16 +342,18 @@ function District({ district }) {
       <SkyTram district={district} />
       <Flyers district={district} />
       <Walkers district={district} />
+      {onStand && <Standable district={district} onStand={onStand} />}
     </group>
   )
 }
 
 // All solarpunk districts, and the shared growing fronts the building and ground shaders read.
-export default function SolarCity({ districts }) {
+// With onStand (photo mode), clicks on bridges, floors and terraces stand you there.
+export default function SolarCity({ districts, onStand }) {
   useFrame(() => {
     const now = performance.now()
     solarUniforms.uZoneCount.value = districts.length
     districts.forEach((d, i) => solarUniforms.uZones.value[i].set(d.center[0], d.center[1], frontAt(d, now), 0))
   })
-  return districts.map((d) => <District key={d.born} district={d} />)
+  return districts.map((d) => <District key={d.born} district={d} onStand={onStand} />)
 }

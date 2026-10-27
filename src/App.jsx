@@ -3,6 +3,8 @@ import City from './City.jsx'
 import { prepareCity, computeReach, MINUTES, SPEED_M_PER_MIN, BAND_M, MAX_SNAP_M } from './reach.js'
 import { growDistrict, GROW_SECONDS, MAX_DISTRICTS } from './solarpunk.js'
 import { USES, REACH_COLORS, labelForUse } from './colors.js'
+import { standPoint, EYE_HEIGHT_M, FOCAL_MM } from './photo.js'
+import CameraHud from './CameraHud.jsx'
 
 const FILES = { kit: 'kit.json', buildings: 'buildings.geojson', graph: 'streets.graph.json', zensus: 'zensus.geojson' }
 
@@ -21,6 +23,7 @@ export default function App() {
   const [districts, setDistricts] = useState([])
   const [radius, setRadius] = useState(240)
   const [notice, setNotice] = useState(null)
+  const [photo, setPhoto] = useState(null) // in photo mode: where the citizen stands, { eye: [x, y] }
 
   useEffect(() => {
     Promise.all(
@@ -38,6 +41,10 @@ export default function App() {
   const city = useMemo(() => data && prepareCity(data), [data])
 
   const pick = (xy) => {
+    if (mode === 'photo') {
+      setPhoto({ eye: standPoint(city, xy) })
+      return
+    }
     if (mode === 'reach') {
       setReach(computeReach(city, xy))
       setMarked(null)
@@ -51,25 +58,52 @@ export default function App() {
     setDistricts([...districts, growDistrict(city, xy, radius, performance.now())])
   }
 
+  const choose = (m) => {
+    setMode(m)
+    if (m !== 'photo') setPhoto(null)
+  }
+
   return (
     <div className="app">
       {city ? (
-        <City city={city} size={data.kit.size_m} reach={mode === 'reach' ? reach : null} marked={mode === 'reach' ? marked : null} districts={districts} onPick={pick} />
+        <City city={city} size={data.kit.size_m} reach={mode === 'reach' ? reach : null} marked={mode === 'reach' ? marked : null} districts={districts} photo={photo} onPick={pick}
+          onStand={mode === 'photo' ? ([x, y, z]) => setPhoto({ eye: [x, y], z }) : null}
+        />
       ) : (
         <p className="loading">{error ? `The city kit didn't load (${error}).` : 'Loading the city kit…'}</p>
       )}
 
-      <aside className="panel">
+      {photo && <CameraHud standing={photo.z ?? 0} onExit={() => setPhoto(null)} />}
+
+      <aside className="panel" hidden={!!photo}>
         <div className="tabs" role="tablist">
-          <button role="tab" aria-selected={mode === 'solarpunk'} className={mode === 'solarpunk' ? 'active' : ''} onClick={() => setMode('solarpunk')}>
-            Solarpunk
-          </button>
-          <button role="tab" aria-selected={mode === 'reach'} className={mode === 'reach' ? 'active' : ''} onClick={() => setMode('reach')}>
-            Walking reach
-          </button>
+          {[['solarpunk', 'Solarpunk'], ['reach', 'Walking reach'], ['photo', 'Photo']].map(([m, label]) => (
+            <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? 'active' : ''} onClick={() => choose(m)}>
+              {label}
+            </button>
+          ))}
         </div>
 
-        {mode === 'solarpunk' ? (
+        {mode === 'photo' ? (
+          <section>
+            <h1>Photo mode</h1>
+            <p className="hint">
+              Click a spot in the city to stand there as a citizen, at eye height ({EYE_HEIGHT_M} m), looking through a{' '}
+              {FOCAL_MM} mm wide-angle lens. If you click a building, you stand on the street nearest to it.
+            </p>
+            <p className="hint">
+              In a grown solarpunk district you can also stand up high: click a skybridge, a tower's floor, terrace or
+              roof garden, a new green storey or a sky-tram platform.
+            </p>
+            <div className="method">
+              <p>
+                At eye level, drag to look around and click another spot to walk there. "Back to map" takes you back up.
+                Grow some solarpunk districts first to stand among their towers, trees and people.
+              </p>
+              <p>The shutter button does not take pictures yet.</p>
+            </div>
+          </section>
+        ) : mode === 'solarpunk' ? (
           <section className="solarpunk">
             <h1>Solarpunk Weimar</h1>
             <p className="hint">
@@ -204,7 +238,7 @@ export default function App() {
         )}
       </aside>
 
-      <aside className="legend">
+      <aside className="legend" hidden={!!photo}>
         <h2>Main use</h2>
         <ul>
           {USES.map((u) => (
